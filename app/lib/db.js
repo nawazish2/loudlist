@@ -19,12 +19,21 @@ async function createSchema() {
     display_name TEXT NOT NULL,
     pitch TEXT NOT NULL,
     category TEXT NOT NULL,
-    amount_cents INTEGER NOT NULL CHECK (amount_cents >= 700),
+    amount_cents INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'cancelled')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     paid_at TIMESTAMPTZ
   )`;
   await query`ALTER TABLE loudlist_claims ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT FALSE`;
+
+  // The floor lives in env.js. Re-assert it as a named constraint on every schema
+  // init so changing it there can never drift from what the table enforces —
+  // including on databases created before the floor moved.
+  const floor = getRequiredBidFloor();
+  if (!Number.isSafeInteger(floor) || floor < 0) throw new Error("Bid floor must be a non-negative integer.");
+  await query`ALTER TABLE loudlist_claims DROP CONSTRAINT IF EXISTS loudlist_claims_amount_cents_check`;
+  await query`ALTER TABLE loudlist_claims DROP CONSTRAINT IF EXISTS loudlist_claims_min_amount`;
+  await query`ALTER TABLE loudlist_claims ADD CONSTRAINT loudlist_claims_min_amount CHECK (amount_cents >= ${query.unsafe(String(floor))})`;
   await query`CREATE INDEX IF NOT EXISTS loudlist_claims_paid_rank_idx ON loudlist_claims (amount_cents DESC, paid_at ASC) WHERE status = 'paid'`;
   await query`CREATE INDEX IF NOT EXISTS loudlist_claims_session_idx ON loudlist_claims (checkout_session_id)`;
   await query`CREATE TABLE IF NOT EXISTS loudlist_rate_events (
@@ -65,6 +74,7 @@ function mapClaim(row) {
     bid: Number(row.amount_cents) / 100,
     amountCents: Number(row.amount_cents),
     status: row.status,
+    hidden: Boolean(row.hidden),
     rank: row.rank === null || row.rank === undefined ? null : Number(row.rank),
     createdAt: row.created_at,
     paidAt: row.paid_at,
@@ -123,8 +133,8 @@ export async function getClaim(claimId) {
   await ensureSchema();
   const query = sql();
   const rows = await query`
-    SELECT c.id, c.url, c.display_name, c.pitch, c.category, c.amount_cents, c.status, c.created_at, c.paid_at,
-      CASE WHEN c.status = 'paid' THEN (
+    SELECT c.id, c.url, c.display_name, c.pitch, c.category, c.amount_cents, c.status, c.hidden, c.created_at, c.paid_at,
+      CASE WHEN c.status = 'paid' AND c.hidden = FALSE THEN (
         SELECT COUNT(*)::INTEGER + 1
         FROM loudlist_claims contender
         WHERE contender.status = 'paid' AND contender.hidden = FALSE
@@ -149,7 +159,22 @@ export async function activateClaim({ claimId, paymentId }) {
   return { activated: rows.length === 1, claim: await getClaim(claimId) };
 }
 
-export async function recordWebhook(webhookId, eventType) {
+// Refunds and disputes never carry our claim_id: the refund payload has its own
+// metadata, and dispute payloads have no metadata at all. Both carry payment_id,
+// which is why it is stored on the claim.
+export async function hideClaimByPaymentId(paymentId) {
+  await ensureSchema();
+  const query = sql();
+  const rows = await query`
+    UPDATE loudlist_claims SET hidden = TRUE
+    WHERE payment_id = ${paymentId} AND hidden = FALSE
+    RETURNING id
+  `;
+  return rows[0]?.id ?? null;
+}
+
+// Claims the webhook id, returning false when this delivery was already handled.
+export async function claimWebhook(webhookId, eventType) {
   await ensureSchema();
   const query = sql();
   const rows = await query`
@@ -159,6 +184,13 @@ export async function recordWebhook(webhookId, eventType) {
     RETURNING webhook_id
   `;
   return rows.length === 1;
+}
+
+// Releases a claimed webhook id after failed processing, so Dodo's retry is not
+// mistaken for a duplicate and silently dropped.
+export async function releaseWebhook(webhookId) {
+  const query = sql();
+  await query`DELETE FROM loudlist_webhook_events WHERE webhook_id = ${webhookId}`;
 }
 
 export async function setClaimHidden(claimId, hidden) {
@@ -175,7 +207,7 @@ export async function listAllClaims(limit = 200) {
     SELECT id, url, display_name, pitch, category, amount_cents, status, hidden, created_at, paid_at, NULL::INTEGER AS rank
     FROM loudlist_claims ORDER BY created_at DESC LIMIT ${limit}
   `;
-  return rows.map((row) => ({ ...mapClaim(row), hidden: row.hidden }));
+  return rows.map(mapClaim);
 }
 
 export async function recordCheckoutAttempt(identifier, windowSeconds, limit) {

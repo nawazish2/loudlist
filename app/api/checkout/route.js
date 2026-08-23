@@ -13,7 +13,9 @@ function response(body, options = {}) {
 }
 
 function requestIdentity(request) {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "anonymous";
+  // x-real-ip is set by the platform; the leftmost x-forwarded-for entry is the
+  // conventionally spoofable position, so it is only the fallback.
+  return request.headers.get("x-real-ip") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous";
 }
 
 export async function POST(request) {
