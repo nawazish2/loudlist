@@ -16,27 +16,6 @@ export function getDatabaseUrl() {
   return databaseUrl;
 }
 
-export function isDodoConfigured() {
-  return Boolean(value("DODO_PAYMENTS_API_KEY") && value("DODO_PAYMENTS_PRODUCT_ID") && value("DODO_PAYMENTS_WEBHOOK_KEY"));
-}
-
-export function getDodoConfig() {
-  const apiKey = value("DODO_PAYMENTS_API_KEY");
-  const productId = value("DODO_PAYMENTS_PRODUCT_ID");
-  const webhookKey = value("DODO_PAYMENTS_WEBHOOK_KEY");
-  const environment = value("DODO_PAYMENTS_ENVIRONMENT") || "test_mode";
-
-  if (!apiKey || !productId || !webhookKey) {
-    throw new ConfigurationError("Dodo Payments is not configured.");
-  }
-
-  if (environment !== "test_mode" && environment !== "live_mode") {
-    throw new ConfigurationError("DODO_PAYMENTS_ENVIRONMENT must be test_mode or live_mode.");
-  }
-
-  return { apiKey, productId, webhookKey, environment };
-}
-
 export function getSiteUrl() {
   const configuredUrl = value("NEXT_PUBLIC_SITE_URL");
   if (configuredUrl) return configuredUrl.replace(/\/$/, "");
@@ -44,7 +23,14 @@ export function getSiteUrl() {
 }
 
 export function getRequiredBidFloor() {
-  return 700;
+  return 100;
+}
+
+// A claim loses half its loudness every 24 hours. Nothing holds the top of the
+// board by being early — only by coming back. This is what keeps the board
+// moving now that claiming is free, so it is deliberately not configurable.
+export function getDecayHalfLifeSeconds() {
+  return 86400;
 }
 
 export function getMaximumBid() {

@@ -13,7 +13,7 @@ export function Ticker() {
   const messages = [
     <><b>● Live board</b> — the loudest corner of the internet</>,
     <>Claim a slot. Turn heads. <b>Share the receipt.</b></>,
-    <>Every rank here was <b>paid for in public</b></>,
+    <>Every claim <b>fades by half a day</b> — come back and shout again</>,
   ];
 
   return (
@@ -64,8 +64,8 @@ export function Hero() {
   );
 }
 
-export function ClaimCard({ onCheckout, selectedBid, minimumBid, isProcessing, entries }) {
-  const [form, setForm] = useState({ name: "", category: "Maker stuff", pitch: "", bid: 7, acceptedRules: false, company: "" });
+export function ClaimCard({ onClaim, selectedBid, minimumBid, isProcessing, entries }) {
+  const [form, setForm] = useState({ name: "", category: claimCategories[0], pitch: "", bid: 1, acceptedRules: false, company: "" });
 
   useEffect(() => {
     if (selectedBid) setForm((current) => ({ ...current, bid: selectedBid }));
@@ -86,7 +86,7 @@ export function ClaimCard({ onCheckout, selectedBid, minimumBid, isProcessing, e
   async function submit(event) {
     event.preventDefault();
     if (!form.name.trim() || isProcessing) return;
-    await onCheckout({
+    await onClaim({
       url: form.name.trim(),
       pitch: form.pitch.trim(),
       category: form.category,
@@ -110,7 +110,7 @@ export function ClaimCard({ onCheckout, selectedBid, minimumBid, isProcessing, e
       <form className="claim" onSubmit={submit}>
         <div className="claim-header">
           <h2 id="claim-title">Make some noise.</h2>
-          <span className="rank-stamp">MIN. $7</span>
+          <span className="rank-stamp">MIN. {money.format(minimumBid)}</span>
         </div>
         <label className="mini" htmlFor="name">What should the world call you?</label>
         <div className="form-row">
@@ -123,11 +123,11 @@ export function ClaimCard({ onCheckout, selectedBid, minimumBid, isProcessing, e
         <input className="field" id="pitch" required minLength="12" maxLength="180" placeholder="I made something you should see." value={form.pitch} onChange={(event) => update("pitch", event.target.value)} />
         <div className="bid-row">
           <div className="amount-box"><span className="currency">$</span><input className="field" type="number" step="1" min={minimumBid} value={form.bid} aria-label="Bid in dollars" onChange={(event) => update("bid", event.target.value)} /></div>
-          <button className="button" type="submit" disabled={isProcessing}>{isProcessing ? "Opening…" : "Claim a spot"}</button>
+          <button className="button" type="submit" disabled={isProcessing}>{isProcessing ? "Shouting…" : "Claim a spot"}</button>
         </div>
-        <label className="rules-check"><input type="checkbox" required checked={form.acceptedRules} onChange={(event) => update("acceptedRules", event.target.checked)} /><span>I agree to the <a href="/terms">board rules</a> and understand a rank is confirmed after payment.</span></label>
+        <label className="rules-check"><input type="checkbox" required checked={form.acceptedRules} onChange={(event) => update("acceptedRules", event.target.checked)} /><span>I agree to the <a href="/terms">board rules</a>.</span></label>
         <div className="honeypot" aria-hidden="true"><label htmlFor="company">Company</label><input id="company" tabIndex="-1" autoComplete="off" value={form.company} onChange={(event) => update("company", event.target.value)} /></div>
-        <p className="claim-note">{projectedRank ? <>This bid lands you at <b>#{projectedRank}</b> right now. </> : null}<b>${minimumBid.toLocaleString()}</b> is the lowest claim on the board. Payments are securely handled by Dodo.</p>
+        <p className="claim-note">{projectedRank ? <>This lands you at <b>#{projectedRank}</b> right now. </> : null}<b>{money.format(minimumBid)}</b> is the lowest claim. It is play money — nobody is charged. Every claim halves in loudness each day, so the board never stops moving.</p>
       </form>
     </section>
   );
@@ -143,7 +143,7 @@ export function Leaderboard({ entries, filter, onFilter, onChallenge, boardState
           <span className="mini">Updated every time someone gets brave</span>
           <h2 id="board-title">The loud board</h2>
         </div>
-        <p>The rank is bought, never bestowed. A claim needs to be one dollar louder than the person directly above it.</p>
+        <p>Nobody is charged a cent — it is play money. A claim needs to be one dollar louder than the person above it, and every claim halves in loudness each day, so nobody holds the top by sitting still.</p>
       </div>
       <div className="filters" role="tablist" aria-label="Board categories">
         {categories.map((category) => (
@@ -165,13 +165,20 @@ export function Leaderboard({ entries, filter, onFilter, onChallenge, boardState
 }
 
 function Entry({ entry, rank, onChallenge }) {
+  // Anything below the number originally shouted has already started fading.
+  const faded = entry.claimedBid && entry.bid < entry.claimedBid - 0.5;
+
   return (
     <article className={`entry ${rank === 1 ? "first" : ""}`}>
       <div className="place">#{rank}<span className="place-label">{rank === 1 ? "currently loudest" : "on the radar"}</span></div>
       <div className="product"><h3 className="product-name">{entry.name}</h3><span className="product-url">{entry.url}</span></div>
       <p className="pitch">{entry.pitch}</p>
       <div><span className="tag">{entry.category}</span></div>
-      <div className="price"><b>{money.format(entry.bid)}</b><span>to beat: {money.format(entry.bid + 1)}</span></div>
+      <div className="price">
+        <b>{money.format(entry.bid)}</b>
+        <span>to beat: {money.format(Math.round(entry.bid) + 1)}</span>
+        {faded ? <span>↓ fading from {money.format(entry.claimedBid)}</span> : null}
+      </div>
       <button className="claim-mini" onClick={() => onChallenge(entry)}>Out-loud<br />this spot</button>
     </article>
   );

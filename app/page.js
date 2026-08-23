@@ -19,8 +19,8 @@ export default function HomePage() {
   const [selectedBid, setSelectedBid] = useState(0);
   const [notice, setNotice] = useState(null);
   const [boardState, setBoardState] = useState("preview");
-  const [minimumBid, setMinimumBid] = useState(7);
-  const [checkoutInFlight, setCheckoutInFlight] = useState(false);
+  const [minimumBid, setMinimumBid] = useState(1);
+  const [claimInFlight, setClaimInFlight] = useState(false);
 
   useEffect(() => {
     if (!notice) return undefined;
@@ -36,7 +36,7 @@ export default function HomePage() {
         if (!response.ok) throw new Error("Board unavailable");
         const payload = await response.json();
         if (!mounted) return;
-        setMinimumBid(Math.max(7, Number(payload.minimumBidCents || 700) / 100));
+        setMinimumBid(Number(payload.minimumBidCents) / 100 || 1);
         if (payload.configured) {
           setEntries(payload.entries || []);
           setBoardState("live");
@@ -58,42 +58,42 @@ export default function HomePage() {
 
   const activity = useMemo(() => {
     return entries
-      .filter((entry) => entry.paidAt)
+      .filter((entry) => entry.claimedAt)
       .slice()
-      .sort((a, b) => new Date(b.paidAt) - new Date(a.paidAt))
+      .sort((a, b) => new Date(b.claimedAt) - new Date(a.claimedAt))
       .slice(0, 5)
       .map((entry) => ({
         id: entry.id,
-        time: relativeTime(entry.paidAt),
+        time: relativeTime(entry.claimedAt),
         subject: entry.name,
-        copy: ` claimed a spot for $${entry.bid.toLocaleString()}.`,
+        copy: ` shouted $${Math.round(entry.claimedBid).toLocaleString()} to get on the board.`,
         rank: `#${entry.rank}`,
         up: entry.rank <= 3,
       }));
   }, [entries]);
 
   function handleChallenge(entry) {
-    const nextBid = Math.max(entry.bid + 1, minimumBid);
+    const nextBid = Math.max(Math.round(entry.bid) + 1, minimumBid);
     setSelectedBid(nextBid);
-    setNotice({ title: "That spot has a price.", message: `$${nextBid} takes the spot ${entry.name} is holding and pushes them down one.` });
+    setNotice({ title: "That spot has a number.", message: `$${nextBid} takes the spot ${entry.name} is holding and pushes them down one.` });
     document.getElementById("how")?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
-  async function handleCheckout(claim) {
-    setCheckoutInFlight(true);
+  async function handleClaim(claim) {
+    setClaimInFlight(true);
     try {
-      const response = await fetch("/api/checkout", {
+      const response = await fetch("/api/claims", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(claim),
       });
       const payload = await response.json();
-      if (!response.ok || !payload.checkoutUrl) throw new Error(payload.error || "Unable to start checkout.");
-      window.location.assign(payload.checkoutUrl);
+      if (!response.ok || !payload.claim) throw new Error(payload.error || "Unable to claim a spot.");
+      window.location.assign(`/claimed?claim=${payload.claim.id}`);
     } catch (error) {
-      setNotice({ title: "Checkout could not start.", message: error.message || "Your card was not charged. Try again in a moment." });
+      setNotice({ title: "That did not land.", message: error.message || "Nothing was claimed. Try again in a moment." });
     } finally {
-      setCheckoutInFlight(false);
+      setClaimInFlight(false);
     }
   }
 
@@ -104,7 +104,7 @@ export default function HomePage() {
         <Navigation claimCount={entries.length} />
         <main id="top">
           <Hero />
-          <ClaimCard onCheckout={handleCheckout} selectedBid={selectedBid} minimumBid={minimumBid} isProcessing={checkoutInFlight} entries={entries} />
+          <ClaimCard onClaim={handleClaim} selectedBid={selectedBid} minimumBid={minimumBid} isProcessing={claimInFlight} entries={entries} />
           <Leaderboard entries={entries} filter={filter} onFilter={setFilter} onChallenge={handleChallenge} boardState={boardState} />
           <ActivityFeed activity={activity} />
         </main>

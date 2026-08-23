@@ -8,7 +8,7 @@ const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD
 export default function ClaimResult() {
   const claimId = useSearchParams().get("claim");
   const [claim, setClaim] = useState(null);
-  const [state, setState] = useState("confirming");
+  const [state, setState] = useState("loading");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -18,43 +18,29 @@ export default function ClaimResult() {
     }
 
     let mounted = true;
-    let attempts = 0;
-    let timeout;
-
-    async function check() {
-      attempts += 1;
+    (async () => {
       try {
         const response = await fetch(`/api/claims/status?claim=${encodeURIComponent(claimId)}`, { cache: "no-store" });
-        if (response.status === 400 || response.status === 404) {
-          if (mounted) setState("missing");
+        if (!mounted) return;
+        if (!response.ok) {
+          setState("missing");
           return;
         }
         const payload = await response.json();
         if (!mounted) return;
-        if (payload.claim) setClaim(payload.claim);
-        if (payload.claim?.status === "paid") {
-          setState("paid");
+        if (!payload.claim) {
+          setState("missing");
           return;
         }
-        if (payload.claim?.status === "cancelled") {
-          setState("cancelled");
-          return;
-        }
+        setClaim(payload.claim);
+        setState(payload.claim.hidden ? "hidden" : "live");
       } catch {
-        // A failed poll is not an answer — keep waiting for the webhook.
+        if (mounted) setState("error");
       }
-      if (!mounted) return;
-      if (attempts >= 30) {
-        setState("slow");
-        return;
-      }
-      timeout = window.setTimeout(check, 2000);
-    }
+    })();
 
-    check();
     return () => {
       mounted = false;
-      window.clearTimeout(timeout);
     };
   }, [claimId]);
 
@@ -76,27 +62,27 @@ export default function ClaimResult() {
     <div className="receipt-shell">
       <a className="brand receipt-brand" href="/"><span className="brand-burst">!</span>LOUDLIST</a>
 
-      {state === "confirming" && (
+      {state === "loading" && (
         <div className="receipt">
-          <span className="mini">Receipt pending</span>
+          <span className="mini">Receipt</span>
           <h1>Counting<br />your noise.</h1>
-          <p className="receipt-copy">Your payment went through. We are waiting for the confirmation that moves you onto the board — it usually lands in a few seconds. Keep this page open.</p>
-          <div className="receipt-wait"><span className="pulse" />Confirming with the payment provider…</div>
+          <div className="receipt-wait"><span className="pulse" />Reading the board…</div>
         </div>
       )}
 
-      {state === "paid" && (
+      {state === "live" && (
         <div className="receipt paid">
-          <span className="mini">Receipt confirmed</span>
+          <span className="mini">You are on the board</span>
           <div className="receipt-rank">#{claim.rank}</div>
           <h1>You are<br />on the board.</h1>
           <div className="receipt-rows">
             <div className="receipt-row"><span>Listing</span><b>{claim.name}</b></div>
             <div className="receipt-row"><span>Pitch</span><b>{claim.pitch}</b></div>
             <div className="receipt-row"><span>Category</span><b>{claim.category}</b></div>
-            <div className="receipt-row"><span>Claim</span><b>{money.format(claim.bid)}</b></div>
-            <div className="receipt-row"><span>To out-loud you</span><b>{money.format(claim.bid + 1)}</b></div>
+            <div className="receipt-row"><span>Claimed at</span><b>{money.format(claim.claimedBid)}</b></div>
+            <div className="receipt-row"><span>To out-loud you</span><b>{money.format(Math.round(claim.bid) + 1)}</b></div>
           </div>
+          <p className="receipt-copy">Your loudness halves every day. Come back and shout again to hold the spot.</p>
           <div className="receipt-actions">
             <button className="button" type="button" onClick={copyShare}>{copied ? "Copied ✓" : "Copy the brag"}</button>
             <a className="claim-mini" href="/#board">See the board</a>
@@ -104,24 +90,21 @@ export default function ClaimResult() {
         </div>
       )}
 
-      {state === "slow" && (
+      {state === "hidden" && (
         <div className="receipt">
-          <span className="mini">Still landing</span>
-          <h1>This one is<br />taking a minute.</h1>
-          <p className="receipt-copy">Your payment is recorded and your spot is reserved — the confirmation just has not reached us yet. Nothing is lost. Refresh this page in a moment, or check the board directly.</p>
-          <div className="receipt-actions">
-            <a className="button" href={`/checkout/success?claim=${claimId}`}>Check again</a>
-            <a className="claim-mini" href="/#board">See the board</a>
-          </div>
+          <span className="mini">Off the board</span>
+          <h1>This one was<br />taken down.</h1>
+          <p className="receipt-copy">A moderator removed this listing from the board. If you think that was a mistake, the board rules explain how it works.</p>
+          <div className="receipt-actions"><a className="button" href="/terms">Board rules</a></div>
         </div>
       )}
 
-      {state === "cancelled" && (
+      {state === "error" && (
         <div className="receipt">
-          <span className="mini">No charge</span>
-          <h1>That claim<br />was let go.</h1>
-          <p className="receipt-copy">This claim was cancelled before it reached the board, so you were not charged. The spot is still up for grabs.</p>
-          <div className="receipt-actions"><a className="button" href="/#how">Claim it again</a></div>
+          <span className="mini">Hmm</span>
+          <h1>We could not<br />read the board.</h1>
+          <p className="receipt-copy">Your claim is fine — we just could not load it this second. Try again in a moment.</p>
+          <div className="receipt-actions"><a className="button" href={`/claimed?claim=${claimId}`}>Try again</a></div>
         </div>
       )}
 
@@ -129,7 +112,7 @@ export default function ClaimResult() {
         <div className="receipt">
           <span className="mini">Nothing here</span>
           <h1>We cannot<br />find that claim.</h1>
-          <p className="receipt-copy">This link is missing its claim reference, or the claim no longer exists. If you were charged, the board will still update on its own.</p>
+          <p className="receipt-copy">This link is missing its claim reference, or the claim no longer exists.</p>
           <div className="receipt-actions"><a className="button" href="/#board">See the board</a></div>
         </div>
       )}

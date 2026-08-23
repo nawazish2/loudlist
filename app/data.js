@@ -31,7 +31,7 @@ export const seedEntries = [
     name: "hotplate",
     url: "hotplate.city",
     pitch: "The map that tells you exactly what one dish you should leave the house for.",
-    category: "Future food",
+    category: "AI",
     bid: 129,
     clicks: "6.8k",
   },
@@ -67,7 +67,7 @@ export const seedEntries = [
     name: "miso.monday",
     url: "miso.monday",
     pitch: "A very opinionated guide to eating yourself out of a bad mood.",
-    category: "Future food",
+    category: "AI",
     bid: 19,
     clicks: "1.5k",
   },
@@ -81,6 +81,6 @@ export const seedActivity = [
   { id: "goodweird", time: "18 MIN", copy: "goodweird is now impossible to explain at dinner, in a good way.", rank: "#5", up: false },
 ];
 
-export const claimCategories = ["Maker stuff", "Creative chaos", "Internet lore", "Future food"];
+export const claimCategories = ["SaaS", "AI", "Maker stuff", "Creative chaos", "Internet lore"];
 
 export const categories = ["All", ...claimCategories];

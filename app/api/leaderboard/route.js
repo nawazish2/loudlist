@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { getLeaderboard, getMinimumBidCents } from "../../lib/db";
-import { isDatabaseConfigured } from "../../lib/env";
+import { getRequiredBidFloor, isDatabaseConfigured } from "../../lib/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   if (!isDatabaseConfigured()) {
-    return NextResponse.json({ entries: [], minimumBidCents: 700, configured: false }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ entries: [], minimumBidCents: getRequiredBidFloor(), configured: false }, { headers: { "Cache-Control": "no-store" } });
   }
   try {
     const [entries, minimumBidCents] = await Promise.all([getLeaderboard(), getMinimumBidCents()]);

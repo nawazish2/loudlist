@@ -20,7 +20,7 @@ const listingUrl = z.string().trim().min(3).max(2048).superRefine((value, contex
   }
 }).transform(normalizeUrl);
 
-export const checkoutRequestSchema = z.object({
+export const claimRequestSchema = z.object({
   url: listingUrl,
   pitch: z.string().trim().min(12, "Write a little more about your project.").max(180),
   category: z.enum(categories),
