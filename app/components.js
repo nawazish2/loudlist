@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { categories, claimCategories } from "./data";
+import { ALL_FILTER } from "./data";
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -11,7 +11,7 @@ const money = new Intl.NumberFormat("en-US", {
 
 export function Ticker() {
   const messages = [
-    <><b>● Live board</b> — the loudest corner of the internet</>,
+    <><b>● Live board</b> — the loudest apps on the App Store</>,
     <>Claim a slot. Turn heads. <b>Share the receipt.</b></>,
     <>Every claim <b>fades by half a day</b> — come back and shout again</>,
   ];
@@ -47,9 +47,9 @@ export function Hero() {
   return (
     <section className="hero" aria-labelledby="hero-title">
       <div>
-        <div className="eyebrow mini">The internet&apos;s attention auction</div>
-        <h1 id="hero-title">Your thing<br />deserves a <span className="underline">louder</span><br />room.</h1>
-        <p className="hero-copy">LoudList is a public wall of internet projects, side quests and hot takes. The bigger your claim, the harder you are to scroll past. Simple math. Big noise.</p>
+        <div className="eyebrow mini">The App Store&apos;s attention auction</div>
+        <h1 id="hero-title">Your app<br />deserves a <span className="underline">louder</span><br />room.</h1>
+        <p className="hero-copy">LoudList is a public wall of iPhone and iPad apps. No install counts, no editorial picks, no algorithm — just how loudly someone is willing to shout about the thing they built.</p>
         <div className="hero-foot">
           <svg className="arrow" viewBox="0 0 46 22" aria-hidden="true"><path d="M1 4c11-5 23 1 29 9M25 4l7 9-11 3" /></svg>
           <span className="scrawl">your future<br />bragging rights →</span>
@@ -65,7 +65,7 @@ export function Hero() {
 }
 
 export function ClaimCard({ onClaim, selectedBid, minimumBid, isProcessing, entries }) {
-  const [form, setForm] = useState({ name: "", category: claimCategories[0], pitch: "", bid: 1, acceptedRules: false, company: "" });
+  const [form, setForm] = useState({ appStoreUrl: "", pitch: "", bid: 1, acceptedRules: false, company: "" });
 
   useEffect(() => {
     if (selectedBid) setForm((current) => ({ ...current, bid: selectedBid }));
@@ -85,11 +85,10 @@ export function ClaimCard({ onClaim, selectedBid, minimumBid, isProcessing, entr
 
   async function submit(event) {
     event.preventDefault();
-    if (!form.name.trim() || isProcessing) return;
+    if (!form.appStoreUrl.trim() || isProcessing) return;
     await onClaim({
-      url: form.name.trim(),
+      appStoreUrl: form.appStoreUrl.trim(),
       pitch: form.pitch.trim(),
-      category: form.category,
       amountCents: Math.round(Math.max(minimumBid, Number(form.bid) || minimumBid) * 100),
       acceptedRules: form.acceptedRules,
       company: form.company,
@@ -99,10 +98,10 @@ export function ClaimCard({ onClaim, selectedBid, minimumBid, isProcessing, entr
   return (
     <section className="action-deck" id="how" aria-labelledby="claim-title">
       <div className="deck-title">
-        <span className="mini">One feed. One winner. Infinite receipts.</span>
-        <h2>Put your<br />name where<br />the noise is.</h2>
+        <span className="mini">One board. One winner. Infinite receipts.</span>
+        <h2>Put your<br />app where<br />the noise is.</h2>
         <div className="deck-stats">
-          <div className="stat"><b>{entries?.length ?? 0}</b>spots claimed</div>
+          <div className="stat"><b>{entries?.length ?? 0}</b>apps on the board</div>
           <div className="stat"><b>{topBid ? money.format(topBid) : "—"}</b>loudest claim</div>
           <div className="stat"><b>{money.format(minimumBid)}</b>cheapest way in</div>
         </div>
@@ -112,29 +111,26 @@ export function ClaimCard({ onClaim, selectedBid, minimumBid, isProcessing, entr
           <h2 id="claim-title">Make some noise.</h2>
           <span className="rank-stamp">MIN. {money.format(minimumBid)}</span>
         </div>
-        <label className="mini" htmlFor="name">What should the world call you?</label>
-        <div className="form-row">
-        <input className="field" id="name" required maxLength="2048" placeholder="your-project.com" value={form.name} onChange={(event) => update("name", event.target.value)} />
-          <select className="field" aria-label="Pick a category" value={form.category} onChange={(event) => update("category", event.target.value)}>
-            {claimCategories.map((category) => <option key={category}>{category}</option>)}
-          </select>
-        </div>
+        <label className="mini" htmlFor="appStoreUrl">Your App Store link</label>
+        <input className="field" id="appStoreUrl" required maxLength="2048" placeholder="apps.apple.com/app/id123456789" value={form.appStoreUrl} onChange={(event) => update("appStoreUrl", event.target.value)} />
         <label className="mini" htmlFor="pitch">The one-line flex</label>
-        <input className="field" id="pitch" required minLength="12" maxLength="180" placeholder="I made something you should see." value={form.pitch} onChange={(event) => update("pitch", event.target.value)} />
+        <input className="field" id="pitch" required minLength="12" maxLength="180" placeholder="I built something you should install." value={form.pitch} onChange={(event) => update("pitch", event.target.value)} />
         <div className="bid-row">
           <div className="amount-box"><span className="currency">$</span><input className="field" type="number" step="1" min={minimumBid} value={form.bid} aria-label="Bid in dollars" onChange={(event) => update("bid", event.target.value)} /></div>
           <button className="button" type="submit" disabled={isProcessing}>{isProcessing ? "Shouting…" : "Claim a spot"}</button>
         </div>
         <label className="rules-check"><input type="checkbox" required checked={form.acceptedRules} onChange={(event) => update("acceptedRules", event.target.checked)} /><span>I agree to the <a href="/terms">board rules</a>.</span></label>
         <div className="honeypot" aria-hidden="true"><label htmlFor="company">Company</label><input id="company" tabIndex="-1" autoComplete="off" value={form.company} onChange={(event) => update("company", event.target.value)} /></div>
-        <p className="claim-note">{projectedRank ? <>This lands you at <b>#{projectedRank}</b> right now. </> : null}<b>{money.format(minimumBid)}</b> is the lowest claim. It is play money — nobody is charged. Every claim halves in loudness each day, so the board never stops moving.</p>
+        <p className="claim-note">{projectedRank ? <>This lands you at <b>#{projectedRank}</b> right now. </> : null}<b>{money.format(minimumBid)}</b> is the lowest claim. It is play money — nobody is charged. The app name, icon and category come straight from the App Store. Every claim halves in loudness each day, so the board never stops moving.</p>
       </form>
     </section>
   );
 }
 
 export function Leaderboard({ entries, filter, onFilter, onChallenge, boardState }) {
-  const visibleEntries = entries.filter((entry) => filter === "All" || entry.category === filter);
+  const visibleEntries = entries.filter((entry) => filter === ALL_FILTER || entry.category === filter);
+  // App Store genres, taken from whatever is actually on the board.
+  const categories = [ALL_FILTER, ...Array.from(new Set(entries.map((entry) => entry.category).filter(Boolean))).sort()];
 
   return (
     <section id="board" aria-labelledby="board-title">
@@ -143,12 +139,12 @@ export function Leaderboard({ entries, filter, onFilter, onChallenge, boardState
           <span className="mini">Updated every time someone gets brave</span>
           <h2 id="board-title">The loud board</h2>
         </div>
-        <p>Nobody is charged a cent — it is play money. A claim needs to be one dollar louder than the person above it, and every claim halves in loudness each day, so nobody holds the top by sitting still.</p>
+        <p>iPhone and iPad apps only, pulled straight from the App Store. Nobody is charged a cent — it is play money. A claim needs to be one dollar louder than the app above it, and every claim halves in loudness each day, so nobody holds the top by sitting still.</p>
       </div>
       <div className="filters" role="tablist" aria-label="Board categories">
         {categories.map((category) => (
           <button className={`filter ${filter === category ? "active" : ""}`} key={category} onClick={() => onFilter(category)} role="tab" aria-selected={filter === category}>
-            {category === "All" ? "All noise" : category}
+            {category === ALL_FILTER ? "All noise" : category}
           </button>
         ))}
       </div>
@@ -158,7 +154,7 @@ export function Leaderboard({ entries, filter, onFilter, onChallenge, boardState
           return <Entry key={entry.id} entry={entry} rank={rank} onChallenge={onChallenge} />;
         })}
         {boardState === "error" && <div className="empty-board"><b>The board is taking a breather.</b><span>We could not reach the live ranks just now. Nothing here is guessed — it will reappear on its own.</span></div>}
-        {boardState !== "error" && visibleEntries.length === 0 && <div className="empty-board"><b>The board is waiting.</b><span>Be the first person reckless enough to claim a spot.</span></div>}
+        {boardState !== "error" && visibleEntries.length === 0 && <div className="empty-board"><b>The board is waiting.</b><span>Be the first developer reckless enough to claim a spot.</span></div>}
       </div>
     </section>
   );
@@ -171,7 +167,13 @@ function Entry({ entry, rank, onChallenge }) {
   return (
     <article className={`entry ${rank === 1 ? "first" : ""}`}>
       <div className="place">#{rank}<span className="place-label">{rank === 1 ? "currently loudest" : "on the radar"}</span></div>
-      <div className="product"><h3 className="product-name">{entry.name}</h3><span className="product-url">{entry.url}</span></div>
+      <div className="product">
+        {entry.iconUrl ? <img className="app-icon" src={entry.iconUrl} alt="" width="44" height="44" loading="lazy" /> : null}
+        <div className="product-text">
+          <h3 className="product-name">{entry.name}</h3>
+          <span className="product-url">{entry.developer}</span>
+        </div>
+      </div>
       <p className="pitch">{entry.pitch}</p>
       <div><span className="tag">{entry.category}</span></div>
       <div className="price">

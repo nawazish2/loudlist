@@ -45,8 +45,8 @@ export default function ClaimResult() {
   }, [claimId]);
 
   const shareText = claim?.rank
-    ? `I just took #${claim.rank} on the LOUDLIST board with ${claim.name}. Come take it from me.`
-    : "I just claimed a spot on the LOUDLIST board.";
+    ? `I just took #${claim.rank} on the LOUDLIST app board with ${claim.name}. Come take it from me.`
+    : "I just claimed a spot on the LOUDLIST app board.";
 
   async function copyShare() {
     try {
@@ -76,7 +76,8 @@ export default function ClaimResult() {
           <div className="receipt-rank">#{claim.rank}</div>
           <h1>You are<br />on the board.</h1>
           <div className="receipt-rows">
-            <div className="receipt-row"><span>Listing</span><b>{claim.name}</b></div>
+            <div className="receipt-row"><span>App</span><b>{claim.name}</b></div>
+            <div className="receipt-row"><span>Developer</span><b>{claim.developer}</b></div>
             <div className="receipt-row"><span>Pitch</span><b>{claim.pitch}</b></div>
             <div className="receipt-row"><span>Category</span><b>{claim.category}</b></div>
             <div className="receipt-row"><span>Claimed at</span><b>{money.format(claim.claimedBid)}</b></div>

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClaim } from "../../lib/db";
+import { AppStoreError, lookupApp } from "../../lib/appstore";
+import { claimApp, getCurrentBidForApp } from "../../lib/db";
 import { isDatabaseConfigured } from "../../lib/env";
 import { limitClaim } from "../../lib/rate-limit";
 import { claimRequestSchema } from "../../lib/validation";
@@ -31,8 +32,28 @@ export async function POST(request) {
     if (!input.success) return response({ error: input.error.issues[0]?.message || "Check the claim details and try again." }, { status: 400 });
     if (input.data.company) return response({ error: "Unable to create this claim." }, { status: 400 });
 
-    const { company, acceptedRules, ...claimInput } = input.data;
-    const claim = await createClaim({ id: crypto.randomUUID(), ...claimInput });
+    let app;
+    try {
+      app = await lookupApp(input.data.appStoreUrl);
+    } catch (error) {
+      if (error instanceof AppStoreError) return response({ error: error.message }, { status: 400 });
+      throw error;
+    }
+
+    const claim = await claimApp({ id: crypto.randomUUID(), ...app, pitch: input.data.pitch, amountCents: input.data.amountCents });
+
+    // No row comes back when the app is already on the board and louder than
+    // this claim, so say exactly what it would take.
+    if (!claim) {
+      const currentCents = await getCurrentBidForApp(app.appId);
+      const needed = currentCents === null ? null : Math.round(currentCents / 100) + 1;
+      return response({
+        error: needed
+          ? `${app.name} is already on the board at $${Math.round(currentCents / 100)}. You need $${needed} to take it.`
+          : `${app.name} is already on the board at a louder number.`,
+      }, { status: 409 });
+    }
+
     return response({ claim });
   } catch (error) {
     console.error("Unable to create LoudList claim", error);

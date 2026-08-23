@@ -1,29 +1,12 @@
 import { z } from "zod";
 import { getMaximumBid, getRequiredBidFloor } from "./env";
-import { claimCategories } from "../data";
 
-export const categories = claimCategories;
-
-function normalizeUrl(value) {
-  const candidate = /^https?:\/\//i.test(value) ? value : `https://${value}`;
-  const parsed = new URL(candidate);
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error("Unsupported protocol");
-  parsed.hash = "";
-  return parsed.toString().replace(/\/$/, "");
-}
-
-const listingUrl = z.string().trim().min(3).max(2048).superRefine((value, context) => {
-  try {
-    normalizeUrl(value);
-  } catch {
-    context.addIssue({ code: "custom", message: "Enter a valid website URL." });
-  }
-}).transform(normalizeUrl);
-
+// The app's name, developer, icon and category all come from the App Store
+// lookup, so the only things a person supplies are the link, the pitch, and
+// how loudly they want to say it.
 export const claimRequestSchema = z.object({
-  url: listingUrl,
-  pitch: z.string().trim().min(12, "Write a little more about your project.").max(180),
-  category: z.enum(categories),
+  appStoreUrl: z.string().trim().min(3, "Paste an App Store link.").max(2048),
+  pitch: z.string().trim().min(12, "Write a little more about your app.").max(180),
   amountCents: z.number().int().min(getRequiredBidFloor()).max(getMaximumBid()),
   acceptedRules: z.literal(true),
   company: z.string().max(0).optional().default(""),

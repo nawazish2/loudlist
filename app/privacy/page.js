@@ -9,10 +9,14 @@ export default function PrivacyPage() {
       <p>We keep the listing you chose to publish, and almost nothing else. There are no payments here, so there is no billing data at all. We do not ask you to make an account, we do not run advertising trackers, we do not build profiles, and we do not sell anything about you.</p>
 
       <h2>What you publish</h2>
-      <p>The URL, display name, pitch, category, and amount of your claim are public by design. That is the product. Do not put anything in those fields you would not want on a public page indefinitely.</p>
+      <p>Your pitch and the amount you claim are public by design. That is the product. Do not put anything in those fields you would not want on a public page indefinitely.</p>
 
       <h2>What we store</h2>
-      <p>Alongside your listing we store the time it was claimed. To rate-limit claims and prevent one person flooding the board, we briefly record your IP address; those records are deleted automatically about an hour later and are never attached to your listing.</p>
+      <p>Alongside your listing we store the App Store link you submitted and the time it was claimed. To rate-limit claims and prevent one person flooding the board, we briefly record your IP address; those records are deleted automatically about an hour later and are never attached to your listing.</p>
+
+      <h2>The App Store lookup</h2>
+      <p>When you submit a link, our server asks Apple&apos;s public iTunes lookup service for that app&apos;s name, developer, icon and category. Only the app&apos;s id is sent — nothing about you goes to Apple, and the request comes from our server, not your browser.</p>
+      <p>App icons on the board are loaded directly from Apple&apos;s content network, so displaying a page does mean your browser requests images from Apple. Apple may see your IP address as a result, exactly as it would if you loaded any page with images hosted there.</p>
 
       <h2>What we never collect</h2>
       <p>No card details, no billing address, no payment references — we take no payments, so none of this exists. No email address, no password, no account.</p>

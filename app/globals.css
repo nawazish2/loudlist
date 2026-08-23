@@ -203,7 +203,10 @@ h1 {
 .entry.first:hover { background: var(--blue); }
 .place { font: 400 35px/1 var(--display); letter-spacing: -.08em; }
 .place-label { display: block; margin-top: 3px; font: 500 9px/1 var(--mono); letter-spacing: .06em; }
-.product { min-width: 0; }
+.product { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.product-text { min-width: 0; }
+.app-icon { flex: none; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); object-fit: cover; }
+.entry:hover .app-icon { border-color: rgba(255, 255, 255, .35); }
 .product-name { margin: 0; font: 800 17px/1.1 var(--sans); letter-spacing: -.04em; }
 .product-url { display: block; margin-top: 5px; color: currentColor; font: 500 10px/1 var(--mono); opacity: .65; }
 .pitch { margin: 0; font-size: 12px; line-height: 1.5; }
@@ -280,6 +283,8 @@ footer { color: var(--paper); background: var(--ink); border-top: 2px solid var(
   .place { font-size: 29px; }
   .product-name { font-size: 14px; }
   .product-url { display: block; max-width: 125px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .product { gap: 8px; }
+  .app-icon { width: 34px; height: 34px; border-radius: 8px; }
   .price span { font-size: 8px; }
   .event { grid-template-columns: 50px 1fr; gap: 9px; }
   .event-rank { display: none; }

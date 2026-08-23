@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { seedEntries } from "./data";
+import { ALL_FILTER, seedEntries } from "./data";
 import { ActivityFeed, ClaimCard, Hero, Leaderboard, Navigation, Ticker, Toast } from "./components";
 
 function relativeTime(value) {
@@ -15,7 +15,7 @@ function relativeTime(value) {
 
 export default function HomePage() {
   const [entries, setEntries] = useState(seedEntries);
-  const [filter, setFilter] = useState("All");
+  const [filter, setFilter] = useState(ALL_FILTER);
   const [selectedBid, setSelectedBid] = useState(0);
   const [notice, setNotice] = useState(null);
   const [boardState, setBoardState] = useState("preview");
@@ -75,7 +75,7 @@ export default function HomePage() {
   function handleChallenge(entry) {
     const nextBid = Math.max(Math.round(entry.bid) + 1, minimumBid);
     setSelectedBid(nextBid);
-    setNotice({ title: "That spot has a number.", message: `$${nextBid} takes the spot ${entry.name} is holding and pushes them down one.` });
+    setNotice({ title: "That spot has a number.", message: `$${nextBid} takes the spot ${entry.name} is holding and pushes it down one.` });
     document.getElementById("how")?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 

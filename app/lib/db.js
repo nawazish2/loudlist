@@ -12,6 +12,7 @@ function sql() {
 // A claim's loudness halves every half-life. Rank is always computed from this
 // decayed value rather than the number someone typed, so the board cannot be
 // won permanently by whoever shouts the biggest number first.
+//
 // The half-life has to be inlined rather than bound: a bind parameter cannot
 // carry the `.0` that forces float division.
 const DECAYED = (query, alias = "") => {
@@ -24,8 +25,11 @@ async function createSchema() {
   const query = sql();
   await query`CREATE TABLE IF NOT EXISTS loudlist_claims (
     id TEXT PRIMARY KEY,
+    app_id TEXT NOT NULL UNIQUE,
     url TEXT NOT NULL,
     display_name TEXT NOT NULL,
+    developer TEXT NOT NULL,
+    icon_url TEXT,
     pitch TEXT NOT NULL,
     category TEXT NOT NULL,
     amount_cents INTEGER NOT NULL,
@@ -59,17 +63,16 @@ export async function ensureSchema() {
   return schemaPromise;
 }
 
-function displayNameFromUrl(url) {
-  return new URL(url).hostname.replace(/^www\./, "");
-}
-
 function mapClaim(row) {
   if (!row) return null;
   const decayedCents = row.decayed_cents === undefined ? Number(row.amount_cents) : Number(row.decayed_cents);
   return {
     id: row.id,
+    appId: row.app_id,
     url: row.url,
     name: row.display_name,
+    developer: row.developer,
+    iconUrl: row.icon_url,
     pitch: row.pitch,
     category: row.category,
     // `bid` is the live, decayed number — what the board shows and what anyone
@@ -88,21 +91,11 @@ export async function getMinimumBidCents() {
   return getRequiredBidFloor();
 }
 
-export async function getProjectedRank(amountCents) {
-  await ensureSchema();
-  const query = sql();
-  const [row] = await query`
-    SELECT COUNT(*)::INTEGER AS ahead FROM loudlist_claims
-    WHERE hidden = FALSE AND ${DECAYED(query)} >= ${amountCents}
-  `;
-  return Number(row.ahead) + 1;
-}
-
 export async function getLeaderboard(limit = 50) {
   await ensureSchema();
   const query = sql();
   const rows = await query`
-    SELECT id, url, display_name, pitch, category, amount_cents, hidden, claimed_at,
+    SELECT id, app_id, url, display_name, developer, icon_url, pitch, category, amount_cents, hidden, claimed_at,
       ${DECAYED(query)} AS decayed_cents,
       ROW_NUMBER() OVER (ORDER BY ${DECAYED(query)} DESC, claimed_at ASC, id ASC)::INTEGER AS rank
     FROM loudlist_claims
@@ -113,19 +106,30 @@ export async function getLeaderboard(limit = 50) {
   return rows.map(mapClaim);
 }
 
-// Insert and read back in one statement. Splitting them would leave a window
-// where the row lands but the read fails, telling someone they missed the board
-// while their claim is sitting on it.
-export async function createClaim({ id, url, pitch, category, amountCents }) {
+// One listing per app. Claiming an app that is already on the board is how you
+// defend it as it fades — but only by being genuinely louder than it is right
+// now, otherwise anyone could knock a rival down by re-claiming their app for a
+// dollar. A rejected claim returns null rather than throwing.
+export async function claimApp({ id, appId, url, name, developer, iconUrl, pitch, category, amountCents }) {
   await ensureSchema();
   const query = sql();
   const rows = await query`
-    WITH inserted AS (
-      INSERT INTO loudlist_claims (id, url, display_name, pitch, category, amount_cents)
-      VALUES (${id}, ${url}, ${displayNameFromUrl(url)}, ${pitch}, ${category}, ${amountCents})
-      RETURNING id, url, display_name, pitch, category, amount_cents, hidden, claimed_at
+    WITH upserted AS (
+      INSERT INTO loudlist_claims (id, app_id, url, display_name, developer, icon_url, pitch, category, amount_cents)
+      VALUES (${id}, ${appId}, ${url}, ${name}, ${developer}, ${iconUrl}, ${pitch}, ${category}, ${amountCents})
+      ON CONFLICT (app_id) DO UPDATE SET
+        amount_cents = EXCLUDED.amount_cents,
+        claimed_at = NOW(),
+        pitch = EXCLUDED.pitch,
+        url = EXCLUDED.url,
+        display_name = EXCLUDED.display_name,
+        developer = EXCLUDED.developer,
+        icon_url = EXCLUDED.icon_url,
+        category = EXCLUDED.category
+      WHERE EXCLUDED.amount_cents > ${DECAYED(query, "loudlist_claims")}
+      RETURNING id, app_id, url, display_name, developer, icon_url, pitch, category, amount_cents, hidden, claimed_at
     )
-    SELECT c.id, c.url, c.display_name, c.pitch, c.category, c.amount_cents, c.hidden, c.claimed_at,
+    SELECT c.id, c.app_id, c.url, c.display_name, c.developer, c.icon_url, c.pitch, c.category, c.amount_cents, c.hidden, c.claimed_at,
       ${DECAYED(query, "c")} AS decayed_cents,
       (
         SELECT COUNT(*)::INTEGER + 1
@@ -133,16 +137,27 @@ export async function createClaim({ id, url, pitch, category, amountCents }) {
         WHERE contender.hidden = FALSE AND contender.id <> c.id
           AND ${DECAYED(query, "contender")} > ${DECAYED(query, "c")}
       ) AS rank
-    FROM inserted c
+    FROM upserted c
   `;
   return mapClaim(rows[0]);
+}
+
+// What it currently costs to take an app that is already listed, so a rejected
+// claim can say how loud it needed to be.
+export async function getCurrentBidForApp(appId) {
+  await ensureSchema();
+  const query = sql();
+  const rows = await query`
+    SELECT ${DECAYED(query)} AS decayed_cents FROM loudlist_claims WHERE app_id = ${appId} LIMIT 1
+  `;
+  return rows.length ? Number(rows[0].decayed_cents) : null;
 }
 
 export async function getClaim(claimId) {
   await ensureSchema();
   const query = sql();
   const rows = await query`
-    SELECT c.id, c.url, c.display_name, c.pitch, c.category, c.amount_cents, c.hidden, c.claimed_at,
+    SELECT c.id, c.app_id, c.url, c.display_name, c.developer, c.icon_url, c.pitch, c.category, c.amount_cents, c.hidden, c.claimed_at,
       ${DECAYED(query, "c")} AS decayed_cents,
       CASE WHEN c.hidden = FALSE THEN (
         SELECT COUNT(*)::INTEGER + 1
@@ -168,7 +183,7 @@ export async function listAllClaims(limit = 200) {
   await ensureSchema();
   const query = sql();
   const rows = await query`
-    SELECT id, url, display_name, pitch, category, amount_cents, hidden, claimed_at,
+    SELECT id, app_id, url, display_name, developer, icon_url, pitch, category, amount_cents, hidden, claimed_at,
       ${DECAYED(query)} AS decayed_cents, NULL::INTEGER AS rank
     FROM loudlist_claims ORDER BY claimed_at DESC LIMIT ${limit}
   `;
