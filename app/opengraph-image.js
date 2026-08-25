@@ -18,7 +18,7 @@ export default function OpengraphImage() {
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", fontSize: 24 }}>
           <span style={{ maxWidth: 620, lineHeight: 1.35 }}>A public wall of iOS apps. The loudest claim wins, and every claim fades.</span>
-          <span style={{ padding: "12px 18px", background: "#ffcf3c", border: "3px solid #17211f", fontWeight: 800 }}>FROM $7</span>
+          <span style={{ padding: "12px 18px", background: "#ffcf3c", border: "3px solid #17211f", fontWeight: 800 }}>FROM $1</span>
         </div>
       </div>
     ),

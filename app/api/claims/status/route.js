@@ -10,7 +10,7 @@ export async function GET(request) {
   if (!claimId.success) return NextResponse.json({ error: "Invalid claim." }, { status: 400 });
   try {
     const claim = await getClaim(claimId.data);
-    if (!claim) return NextResponse.json({ error: "Claim not found." }, { status: 404 });
+    if (!claim || claim.hidden) return NextResponse.json({ error: "Claim not found." }, { status: 404 });
     return NextResponse.json({ claim }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("Unable to read claim status", error);

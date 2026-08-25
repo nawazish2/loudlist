@@ -1,20 +1,23 @@
 import "server-only";
 
+import { CLAIM_RATE_LIMIT, CLAIM_RATE_WINDOW_SECONDS, REPORT_RATE_LIMIT, REPORT_RATE_WINDOW_SECONDS } from "./constants";
 import { recordClaimAttempt } from "./db";
 import { isDatabaseConfigured } from "./env";
 
-// Claiming is free now, so this is the only thing standing between the board and
-// someone flooding it. A real person claims once and re-claims as their spot
-// fades; five in ten minutes is far more than that and still stops a flood.
-const WINDOW_SECONDS = 600;
-const LIMIT = 5;
-
-export async function limitClaim(identifier) {
+async function limit(identifier, windowSeconds, maxAttempts) {
   if (!isDatabaseConfigured()) return { success: false, reset: 0 };
   try {
-    const { success } = await recordClaimAttempt(identifier, WINDOW_SECONDS, LIMIT);
-    return { success, reset: WINDOW_SECONDS };
+    const { success } = await recordClaimAttempt(identifier, windowSeconds, maxAttempts);
+    return { success, reset: windowSeconds };
   } catch {
     return { success: false, reset: 0 };
   }
+}
+
+export async function limitClaim(identifier) {
+  return limit(`claim:${identifier}`, CLAIM_RATE_WINDOW_SECONDS, CLAIM_RATE_LIMIT);
+}
+
+export async function limitReport(identifier) {
+  return limit(`report:${identifier}`, REPORT_RATE_WINDOW_SECONDS, REPORT_RATE_LIMIT);
 }

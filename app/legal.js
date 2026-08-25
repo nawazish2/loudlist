@@ -1,12 +1,14 @@
+import Link from "next/link";
+
 export function LegalPage({ eyebrow, title, updated, children }) {
   return (
     <div className="legal-shell">
-      <a className="brand" href="/"><span className="brand-burst">!</span>LOUDLIST</a>
+      <Link className="brand" href="/"><span className="brand-burst">!</span>LOUDLIST</Link>
       <span className="mini">{eyebrow}</span>
       <h1>{title}</h1>
       <p className="legal-updated">Last updated {updated}</p>
       <div className="legal-body">{children}</div>
-      <a className="claim-mini legal-back" href="/">← Back to the board</a>
+      <Link className="claim-mini legal-back" href="/">← Back to the board</Link>
     </div>
   );
 }
