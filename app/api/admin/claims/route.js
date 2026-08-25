@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
-import { listAllClaims, setClaimHidden } from "../../../lib/db";
+import { listAllClaims, listReports, setClaimHidden } from "../../../lib/db";
 import { ConfigurationError, getAdminToken } from "../../../lib/env";
 import { claimIdSchema } from "../../../lib/validation";
 
@@ -28,20 +28,30 @@ function guard(request) {
 export async function GET(request) {
   const denied = guard(request);
   if (denied) return denied;
-  const claims = await listAllClaims();
-  return NextResponse.json({ claims }, { headers: { "Cache-Control": "no-store" } });
+  try {
+    const [claims, reports] = await Promise.all([listAllClaims(), listReports()]);
+    return NextResponse.json({ claims, reports }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    console.error("Unable to list LoudList claims", error);
+    return NextResponse.json({ error: "Unable to read claims right now." }, { status: 503 });
+  }
 }
 
 export async function PATCH(request) {
   const denied = guard(request);
   if (denied) return denied;
 
-  const body = await request.json().catch(() => ({}));
-  const claimId = claimIdSchema.safeParse(body.claimId);
-  if (!claimId.success) return NextResponse.json({ error: "Invalid claim id." }, { status: 400 });
-  if (typeof body.hidden !== "boolean") return NextResponse.json({ error: "hidden must be a boolean." }, { status: 400 });
+  try {
+    const body = await request.json().catch(() => ({}));
+    const claimId = claimIdSchema.safeParse(body.claimId);
+    if (!claimId.success) return NextResponse.json({ error: "Invalid claim id." }, { status: 400 });
+    if (typeof body.hidden !== "boolean") return NextResponse.json({ error: "hidden must be a boolean." }, { status: 400 });
 
-  const updated = await setClaimHidden(claimId.data, body.hidden);
-  if (!updated) return NextResponse.json({ error: "Claim not found." }, { status: 404 });
-  return NextResponse.json({ claimId: claimId.data, hidden: body.hidden });
+    const updated = await setClaimHidden(claimId.data, body.hidden);
+    if (!updated) return NextResponse.json({ error: "Claim not found." }, { status: 404 });
+    return NextResponse.json({ claimId: claimId.data, hidden: body.hidden });
+  } catch (error) {
+    console.error("Unable to update LoudList claim", error);
+    return NextResponse.json({ error: "Unable to update that claim right now." }, { status: 503 });
+  }
 }

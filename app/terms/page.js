@@ -4,7 +4,7 @@ export const metadata = { title: "Board rules — LOUDLIST" };
 
 export default function TermsPage() {
   return (
-    <LegalPage eyebrow="The fine print" title={<>Board<br />rules.</>} updated="23 August 2026">
+    <LegalPage eyebrow="The fine print" title={<>Board<br />rules.</>} updated="25 August 2026">
       <h2>iOS apps only</h2>
       <p>This board lists iPhone and iPad apps and nothing else. A listing is created from an App Store link, and the app&apos;s name, developer, icon and category are taken from the App Store rather than typed in. Mac-only apps, and anything on Apple&apos;s store that is not an app, are refused.</p>
 
@@ -25,7 +25,7 @@ export default function TermsPage() {
       <p>You may not submit a pitch that is illegal, that infringes someone else&apos;s rights, that impersonates another person or business, that promotes malware, fraud, or scams, or that harasses or targets a specific person. The pitch is the one part of a listing you write, so it is the part you are responsible for — it must describe the app honestly.</p>
 
       <h2>App Store content</h2>
-      <p>App names, developer names, icons and categories belong to their respective developers and are shown here as published on the App Store. LOUDLIST is not affiliated with, endorsed by, or sponsored by Apple. If you are a developer and want your app off the board, contact us and we will remove it.</p>
+      <p>App names, developer names, icons and categories belong to their respective developers and are shown here as published on the App Store. LOUDLIST is not affiliated with, endorsed by, or sponsored by Apple. If you are a developer and want your app off the board, email us at the address on the <a href="/privacy">privacy page</a> and we will remove it.</p>
 
       <h2>Removal</h2>
       <p>We may hide or remove any listing that breaks these rules, without notice and at our discretion. Because nothing was paid, nothing is owed either way.</p>

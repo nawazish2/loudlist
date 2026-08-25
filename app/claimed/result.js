@@ -1,21 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-
-const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+import { money } from "../lib/money";
 
 export default function ClaimResult() {
   const claimId = useSearchParams().get("claim");
   const [claim, setClaim] = useState(null);
-  const [state, setState] = useState("loading");
+  const [state, setState] = useState(claimId ? "loading" : "missing");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (!claimId) {
-      setState("missing");
-      return undefined;
-    }
+    if (!claimId) return undefined;
 
     let mounted = true;
     (async () => {
@@ -60,7 +57,7 @@ export default function ClaimResult() {
 
   return (
     <div className="receipt-shell">
-      <a className="brand receipt-brand" href="/"><span className="brand-burst">!</span>LOUDLIST</a>
+      <Link className="brand receipt-brand" href="/"><span className="brand-burst">!</span>LOUDLIST</Link>
 
       {state === "loading" && (
         <div className="receipt">
@@ -86,7 +83,7 @@ export default function ClaimResult() {
           <p className="receipt-copy">Your loudness halves every day. Come back and shout again to hold the spot.</p>
           <div className="receipt-actions">
             <button className="button" type="button" onClick={copyShare}>{copied ? "Copied ✓" : "Copy the brag"}</button>
-            <a className="claim-mini" href="/#board">See the board</a>
+            <Link className="claim-mini" href="/#board">See the board</Link>
           </div>
         </div>
       )}
@@ -96,7 +93,7 @@ export default function ClaimResult() {
           <span className="mini">Off the board</span>
           <h1>This one was<br />taken down.</h1>
           <p className="receipt-copy">A moderator removed this listing from the board. If you think that was a mistake, the board rules explain how it works.</p>
-          <div className="receipt-actions"><a className="button" href="/terms">Board rules</a></div>
+          <div className="receipt-actions"><Link className="button" href="/terms">Board rules</Link></div>
         </div>
       )}
 
@@ -105,7 +102,7 @@ export default function ClaimResult() {
           <span className="mini">Hmm</span>
           <h1>We could not<br />read the board.</h1>
           <p className="receipt-copy">Your claim is fine — we just could not load it this second. Try again in a moment.</p>
-          <div className="receipt-actions"><a className="button" href={`/claimed?claim=${claimId}`}>Try again</a></div>
+          <div className="receipt-actions"><Link className="button" href={`/claimed?claim=${claimId}`}>Try again</Link></div>
         </div>
       )}
 
@@ -114,7 +111,7 @@ export default function ClaimResult() {
           <span className="mini">Nothing here</span>
           <h1>We cannot<br />find that claim.</h1>
           <p className="receipt-copy">This link is missing its claim reference, or the claim no longer exists.</p>
-          <div className="receipt-actions"><a className="button" href="/#board">See the board</a></div>
+          <div className="receipt-actions"><Link className="button" href="/#board">See the board</Link></div>
         </div>
       )}
     </div>

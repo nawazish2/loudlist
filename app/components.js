@@ -1,23 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { ALL_FILTER } from "./data";
+import { money } from "./lib/money";
 
-const money = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
-
-export function Ticker() {
+export function Ticker({ boardState = "live" }) {
+  const liveLabel = boardState === "preview" ? "Preview board" : boardState === "error" ? "Board paused" : "Live board";
   const messages = [
-    <><b>● Live board</b> — the loudest apps on the App Store</>,
+    <><b>● {liveLabel}</b> — the loudest apps on the App Store</>,
     <>Claim a slot. Turn heads. <b>Share the receipt.</b></>,
     <>Every claim <b>fades by half a day</b> — come back and shout again</>,
   ];
 
   return (
-    <div className="ticker" aria-label="Live site updates">
+    <div className="ticker" aria-label="Site updates">
       <div className="ticker-track">
         {[...messages, ...messages].map((message, index) => (
           <span className="ticker-item" key={index}>
@@ -30,13 +28,24 @@ export function Ticker() {
 }
 
 export function Navigation({ claimCount }) {
+  const [open, setOpen] = useState(false);
+
   return (
     <nav>
       <a className="brand" href="#top" aria-label="LoudList home"><span className="brand-burst">!</span>LOUDLIST</a>
-      <div className="nav-links">
-        <a href="#board">The board</a>
-        <a href="#activity">The noise</a>
-        <a href="#how">How it works</a>
+      <button
+        className="nav-toggle"
+        type="button"
+        aria-expanded={open}
+        aria-controls="site-nav"
+        onClick={() => setOpen((current) => !current)}
+      >
+        {open ? "Close" : "Menu"}
+      </button>
+      <div className={`nav-links ${open ? "open" : ""}`} id="site-nav">
+        <a href="#board" onClick={() => setOpen(false)}>The board</a>
+        <a href="#activity" onClick={() => setOpen(false)}>The noise</a>
+        <a href="#how" onClick={() => setOpen(false)}>How it works</a>
       </div>
       <div className="live-pill"><span className="pulse" /><span>{claimCount.toLocaleString()}</span> ON THE BOARD</div>
     </nav>
@@ -64,22 +73,18 @@ export function Hero() {
   );
 }
 
-export function ClaimCard({ onClaim, selectedBid, minimumBid, isProcessing, entries }) {
-  const [form, setForm] = useState({ appStoreUrl: "", pitch: "", bid: 1, acceptedRules: false, company: "" });
+export function ClaimCard({ onClaim, selectedBid, minimumBid, maximumBid, isProcessing, entries, onBidEdit }) {
+  const [form, setForm] = useState({ appStoreUrl: "", pitch: "", bid: minimumBid, acceptedRules: false, company: "" });
 
-  useEffect(() => {
-    if (selectedBid) setForm((current) => ({ ...current, bid: selectedBid }));
-  }, [selectedBid]);
-
-  useEffect(() => {
-    setForm((current) => current.bid < minimumBid ? { ...current, bid: minimumBid } : current);
-  }, [minimumBid]);
-
-  const bidDollars = Math.max(minimumBid, Number(form.bid) || minimumBid);
+  const bidDollars = Math.min(
+    maximumBid,
+    Math.max(minimumBid, Number(selectedBid || form.bid) || minimumBid),
+  );
   const topBid = entries?.length ? Math.max(...entries.map((entry) => entry.bid)) : 0;
   const projectedRank = entries?.length ? entries.filter((entry) => entry.bid >= bidDollars).length + 1 : null;
 
   function update(field, value) {
+    if (field === "bid") onBidEdit?.();
     setForm((current) => ({ ...current, [field]: value }));
   }
 
@@ -89,7 +94,7 @@ export function ClaimCard({ onClaim, selectedBid, minimumBid, isProcessing, entr
     await onClaim({
       appStoreUrl: form.appStoreUrl.trim(),
       pitch: form.pitch.trim(),
-      amountCents: Math.round(Math.max(minimumBid, Number(form.bid) || minimumBid) * 100),
+      amountCents: Math.round(bidDollars * 100),
       acceptedRules: form.acceptedRules,
       company: form.company,
     });
@@ -116,20 +121,31 @@ export function ClaimCard({ onClaim, selectedBid, minimumBid, isProcessing, entr
         <label className="mini" htmlFor="pitch">The one-line flex</label>
         <input className="field" id="pitch" required minLength="12" maxLength="180" placeholder="I built something you should install." value={form.pitch} onChange={(event) => update("pitch", event.target.value)} />
         <div className="bid-row">
-          <div className="amount-box"><span className="currency">$</span><input className="field" type="number" step="1" min={minimumBid} value={form.bid} aria-label="Bid in dollars" onChange={(event) => update("bid", event.target.value)} /></div>
+          <div className="amount-box">
+            <span className="currency">$</span>
+            <input
+              className="field"
+              type="number"
+              step="1"
+              min={minimumBid}
+              max={maximumBid}
+              value={bidDollars}
+              aria-label="Bid in dollars"
+              onChange={(event) => update("bid", event.target.value)}
+            />
+          </div>
           <button className="button" type="submit" disabled={isProcessing}>{isProcessing ? "Shouting…" : "Claim a spot"}</button>
         </div>
-        <label className="rules-check"><input type="checkbox" required checked={form.acceptedRules} onChange={(event) => update("acceptedRules", event.target.checked)} /><span>I agree to the <a href="/terms">board rules</a>.</span></label>
+        <label className="rules-check"><input type="checkbox" required checked={form.acceptedRules} onChange={(event) => update("acceptedRules", event.target.checked)} /><span>I agree to the <Link href="/terms">board rules</Link>.</span></label>
         <div className="honeypot" aria-hidden="true"><label htmlFor="company">Company</label><input id="company" tabIndex="-1" autoComplete="off" value={form.company} onChange={(event) => update("company", event.target.value)} /></div>
-        <p className="claim-note">{projectedRank ? <>This lands you at <b>#{projectedRank}</b> right now. </> : null}<b>{money.format(minimumBid)}</b> is the lowest claim. It is play money — nobody is charged. The app name, icon and category come straight from the App Store. Every claim halves in loudness each day, so the board never stops moving.</p>
+        <p className="claim-note">{projectedRank ? <>This lands you at <b>#{projectedRank}</b> right now. </> : null}<b>{money.format(minimumBid)}</b> is the lowest claim, <b>{money.format(maximumBid)}</b> is the ceiling. It is play money — nobody is charged. The app name, icon and category come straight from the App Store. Every claim halves in loudness each day, so the board never stops moving.</p>
       </form>
     </section>
   );
 }
 
-export function Leaderboard({ entries, filter, onFilter, onChallenge, boardState }) {
+export function Leaderboard({ entries, filter, onFilter, onChallenge, onReport, boardState }) {
   const visibleEntries = entries.filter((entry) => filter === ALL_FILTER || entry.category === filter);
-  // App Store genres, taken from whatever is actually on the board.
   const categories = [ALL_FILTER, ...Array.from(new Set(entries.map((entry) => entry.category).filter(Boolean))).sort()];
 
   return (
@@ -141,17 +157,23 @@ export function Leaderboard({ entries, filter, onFilter, onChallenge, boardState
         </div>
         <p>iPhone and iPad apps only, pulled straight from the App Store. Nobody is charged a cent — it is play money. A claim needs to be one dollar louder than the app above it, and every claim halves in loudness each day, so nobody holds the top by sitting still.</p>
       </div>
-      <div className="filters" role="tablist" aria-label="Board categories">
+      <div className="filters" role="group" aria-label="Board categories">
         {categories.map((category) => (
-          <button className={`filter ${filter === category ? "active" : ""}`} key={category} onClick={() => onFilter(category)} role="tab" aria-selected={filter === category}>
+          <button
+            className={`filter ${filter === category ? "active" : ""}`}
+            type="button"
+            key={category}
+            onClick={() => onFilter(category)}
+            aria-pressed={filter === category}
+          >
             {category === ALL_FILTER ? "All noise" : category}
           </button>
         ))}
       </div>
       <div className="board" aria-live="polite">
         {visibleEntries.map((entry) => {
-          const rank = entries.indexOf(entry) + 1;
-          return <Entry key={entry.id} entry={entry} rank={rank} onChallenge={onChallenge} />;
+          const rank = entry.rank || entries.indexOf(entry) + 1;
+          return <Entry key={entry.id} entry={entry} rank={rank} onChallenge={onChallenge} onReport={onReport} />;
         })}
         {boardState === "error" && <div className="empty-board"><b>The board is taking a breather.</b><span>We could not reach the live ranks just now. Nothing here is guessed — it will reappear on its own.</span></div>}
         {boardState !== "error" && visibleEntries.length === 0 && <div className="empty-board"><b>The board is waiting.</b><span>Be the first developer reckless enough to claim a spot.</span></div>}
@@ -160,15 +182,14 @@ export function Leaderboard({ entries, filter, onFilter, onChallenge, boardState
   );
 }
 
-function Entry({ entry, rank, onChallenge }) {
-  // Anything below the number originally shouted has already started fading.
+function Entry({ entry, rank, onChallenge, onReport }) {
   const faded = entry.claimedBid && entry.bid < entry.claimedBid - 0.5;
 
   return (
     <article className={`entry ${rank === 1 ? "first" : ""}`}>
       <div className="place">#{rank}<span className="place-label">{rank === 1 ? "currently loudest" : "on the radar"}</span></div>
       <div className="product">
-        {entry.iconUrl ? <img className="app-icon" src={entry.iconUrl} alt="" width="44" height="44" loading="lazy" /> : null}
+        {entry.iconUrl ? <Image className="app-icon" src={entry.iconUrl} alt="" width={44} height={44} /> : null}
         <div className="product-text">
           <h3 className="product-name">{entry.name}</h3>
           <span className="product-url">{entry.developer}</span>
@@ -181,7 +202,10 @@ function Entry({ entry, rank, onChallenge }) {
         <span>to beat: {money.format(Math.round(entry.bid) + 1)}</span>
         {faded ? <span>↓ fading from {money.format(entry.claimedBid)}</span> : null}
       </div>
-      <button className="claim-mini" onClick={() => onChallenge(entry)}>Out-loud<br />this spot</button>
+      <div className="entry-actions">
+        <button className="claim-mini" type="button" onClick={() => onChallenge(entry)}>Out-loud<br />this spot</button>
+        {onReport && entry.id ? <button className="report-mini" type="button" onClick={() => onReport(entry)}>Report</button> : null}
+      </div>
     </article>
   );
 }
@@ -200,7 +224,7 @@ export function ActivityFeed({ activity }) {
           <div className="event" key={event.id}>
             <span className="event-time">{event.time}</span>
             <div className="event-copy"><b>{event.subject}</b>{event.copy}</div>
-            <span className={`event-rank ${event.up ? "up" : ""}`}>{event.rank}</span>
+            {event.rank ? <span className={`event-rank ${event.up ? "up" : ""}`}>{event.rank}</span> : null}
           </div>
         ))}
       </div>
@@ -211,7 +235,7 @@ export function ActivityFeed({ activity }) {
 export function Toast({ notice, onClose }) {
   return (
     <div className={`toast ${notice ? "show" : ""}`} role="status" aria-live="polite">
-      <button onClick={onClose} aria-label="Dismiss">×</button>
+      <button type="button" onClick={onClose} aria-label="Dismiss">×</button>
       <strong>{notice?.title ?? "Your noise is ready."}</strong>
       <p>{notice?.message ?? "You just grabbed a part of the board."}</p>
     </div>

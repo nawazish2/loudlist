@@ -1,6 +1,25 @@
+import { Archivo_Black, DM_Mono, Manrope } from "next/font/google";
+import { getPublicSiteUrl } from "./lib/constants";
 import "./globals.css";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "http://localhost:3000";
+const display = Archivo_Black({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-display",
+});
+
+const sans = Manrope({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
+
+const mono = DM_Mono({
+  weight: ["400", "500"],
+  subsets: ["latin"],
+  variable: "--font-mono",
+});
+
+const siteUrl = getPublicSiteUrl();
 
 export const metadata = {
   metadataBase: new URL(siteUrl),
@@ -22,7 +41,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
       <body>{children}</body>
     </html>
   );
