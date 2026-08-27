@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { AppStoreError, extractAppId, parseAppStoreUrl } from "./appstore-url";
 import { beatsCurrent, decayedCents } from "./decay";
+import { centsToBeat, dollarsToBeat } from "./money";
 import { isAllowedClaimOrigin } from "./origin";
 import { relativeTime } from "./relative-time";
+import { requestIdentity } from "./request-identity";
 import { claimRequestSchema } from "./validation";
 
 function request(headers: Record<string, string>, url = "http://localhost:3000/api/claims") {
@@ -44,10 +46,16 @@ describe("decayedCents", () => {
     expect(decayedCents(9000, claimedAt, claimedAt + 86_400_000)).toBe(4500);
   });
 
-  it("only lets a louder claim beat the live value", () => {
+  it("only lets a whole dollar louder claim beat the live value", () => {
     const now = claimedAt + 86_400_000;
     expect(beatsCurrent(4500, 9000, claimedAt, now)).toBe(false);
-    expect(beatsCurrent(4501, 9000, claimedAt, now)).toBe(true);
+    expect(beatsCurrent(4501, 9000, claimedAt, now)).toBe(false);
+    expect(beatsCurrent(4600, 9000, claimedAt, now)).toBe(true);
+  });
+
+  it("rejects the same dollar amount immediately after a claim", () => {
+    expect(beatsCurrent(9000, 9000, claimedAt, claimedAt + 1)).toBe(false);
+    expect(beatsCurrent(9100, 9000, claimedAt, claimedAt + 1)).toBe(true);
   });
 });
 
@@ -69,6 +77,19 @@ describe("isAllowedClaimOrigin", () => {
       ),
     ).toBe(true);
   });
+
+  it("rejects posts with no origin or referer", () => {
+    expect(isAllowedClaimOrigin(request({}), "http://localhost:3000")).toBe(false);
+  });
+
+  it("allows a matching referer when origin is absent", () => {
+    expect(
+      isAllowedClaimOrigin(
+        request({ referer: "http://localhost:3000/#board" }),
+        "http://localhost:3000",
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("relativeTime", () => {
@@ -86,5 +107,45 @@ describe("claimRequestSchema", () => {
       acceptedRules: true,
     });
     expect(result.success).toBe(false);
+  });
+
+  it("parses a filled honeypot so the route can reject it opaquely", () => {
+    const result = claimRequestSchema.safeParse({
+      appStoreUrl: "https://apps.apple.com/us/app/id123456789",
+      pitch: "I built something you should install.",
+      amountCents: 100,
+      acceptedRules: true,
+      company: "BuyCheapFollowers",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.company).toBe("BuyCheapFollowers");
+  });
+});
+
+describe("centsToBeat", () => {
+  it("asks for the next whole dollar that is at least $1 above current loudness", () => {
+    expect(centsToBeat(9000)).toBe(9100);
+    expect(centsToBeat(8999.9)).toBe(9100);
+    expect(centsToBeat(4560)).toBe(4700);
+    expect(centsToBeat(4500)).toBe(4600);
+    expect(dollarsToBeat(45.6)).toBe(47);
+  });
+});
+
+describe("requestIdentity", () => {
+  it("prefers Vercel client IP over a spoofed forwarded-for list", () => {
+    expect(
+      requestIdentity(
+        request({
+          "x-vercel-id": "sfo1::abc",
+          "x-vercel-forwarded-for": "203.0.113.10",
+          "x-forwarded-for": "1.2.3.4, 203.0.113.10",
+        }),
+      ),
+    ).toBe("203.0.113.10");
+  });
+
+  it("uses the last forwarded hop off Vercel so client-supplied prefixes cannot rotate the bucket", () => {
+    expect(requestIdentity(request({ "x-forwarded-for": "1.2.3.4, 10.0.0.8" }))).toBe("10.0.0.8");
   });
 });

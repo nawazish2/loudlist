@@ -7,7 +7,7 @@ export default function PrivacyPage() {
   const contactEmail = getContactEmail();
 
   return (
-    <LegalPage eyebrow="What we keep" title={<>Privacy.</>} updated="25 August 2026">
+    <LegalPage eyebrow="What we keep" title={<>Privacy.</>} updated="27 August 2026">
       <h2>The short version</h2>
       <p>We keep the listing you chose to publish, and almost nothing else. There are no payments here, so there is no billing data at all. We do not ask you to make an account, we do not run advertising trackers, we do not build profiles, and we do not sell anything about you.</p>
 
@@ -15,7 +15,7 @@ export default function PrivacyPage() {
       <p>Your pitch and the amount you claim are public by design. That is the product. Do not put anything in those fields you would not want on a public page indefinitely.</p>
 
       <h2>What we store</h2>
-      <p>Alongside your listing we store the App Store link you submitted and the time it was claimed. A public activity log keeps the same shout that appeared on the board. If someone reports a listing, we store that report so a moderator can act on it.</p>
+      <p>Alongside your listing we store the App Store link you submitted and the time it was claimed. A public activity log keeps the same shout that appeared on the board. If someone reports a listing, we store that report so a moderator can act on it, and we may forward it to a private moderation inbox we operate.</p>
       <p>To rate-limit claims and reports, we briefly record your IP address against a time window. Those records are deleted automatically after the window expires and are never attached to your listing.</p>
 
       <h2>The App Store lookup</h2>

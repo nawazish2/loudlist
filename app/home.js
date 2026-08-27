@@ -2,22 +2,35 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ActivityFeed, ClaimCard, Hero, Leaderboard, Navigation, Ticker, Toast } from "./components";
+import { ActivityFeed, ClaimCard, Hero, Leaderboard, Navigation, ReportModal, Ticker, Toast } from "./components";
 import { ALL_FILTER } from "./data";
 import { getContactEmail } from "./lib/constants";
+import { dollarsToBeat } from "./lib/money";
 import { relativeTime } from "./lib/relative-time";
 
-export default function HomePage({ initialEntries, initialEvents, boardState: initialBoardState, minimumBid, maximumBid }) {
+export default function HomePage({ initialEntries, initialEvents, boardState: initialBoardState, minimumBid, maximumBid, initialAppStoreUrl = "" }) {
   const [entries, setEntries] = useState(initialEntries);
   const [events, setEvents] = useState(initialEvents);
   const [filter, setFilter] = useState(ALL_FILTER);
   const [selectedBid, setSelectedBid] = useState(0);
-  const [notice, setNotice] = useState(null);
+  const [notice, setNotice] = useState(
+    initialAppStoreUrl
+      ? { title: "Shout again.", message: "The App Store link is filled in. Pick a louder number before this listing fades." }
+      : null,
+  );
   const [boardState, setBoardState] = useState(initialBoardState);
   const [floor, setFloor] = useState(minimumBid);
   const [ceiling, setCeiling] = useState(maximumBid);
   const [claimInFlight, setClaimInFlight] = useState(false);
+  const [reportEntry, setReportEntry] = useState(null);
+  const [reportSending, setReportSending] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    if (!initialAppStoreUrl) return undefined;
+    document.getElementById("how")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    return undefined;
+  }, [initialAppStoreUrl]);
 
   useEffect(() => {
     if (!notice) return undefined;
@@ -76,9 +89,9 @@ export default function HomePage({ initialEntries, initialEvents, boardState: in
   }, [entries, events]);
 
   function handleChallenge(entry) {
-    const nextBid = Math.max(Math.round(entry.bid) + 1, floor);
+    const nextBid = Math.max(dollarsToBeat(entry.bid), floor);
     setSelectedBid(Math.min(nextBid, ceiling));
-    setNotice({ title: "That spot has a number.", message: `$${nextBid} takes the spot ${entry.name} is holding and pushes it down one.` });
+    setNotice({ title: "That spot has a number.", message: `$${nextBid} takes ${entry.name}'s spot — one whole dollar louder than it is right now.` });
     document.getElementById("how")?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
@@ -100,20 +113,27 @@ export default function HomePage({ initialEntries, initialEvents, boardState: in
     }
   }
 
-  async function handleReport(entry) {
-    const reason = window.prompt(`Why should ${entry.name} come off the board?`, "This listing breaks the board rules.");
-    if (!reason) return;
+  function openReport(entry) {
+    setReportEntry(entry);
+  }
+
+  async function submitReport(reason) {
+    if (!reportEntry || reportSending) return;
+    setReportSending(true);
     try {
       const response = await fetch("/api/reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ claimId: entry.id, reason }),
+        body: JSON.stringify({ claimId: reportEntry.id, reason }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "Unable to send that report.");
+      setReportEntry(null);
       setNotice({ title: "Report in.", message: "A moderator will see this. Thanks for keeping the board honest." });
     } catch (error) {
       setNotice({ title: "Report did not send.", message: error.message || "Try again in a moment." });
+    } finally {
+      setReportSending(false);
     }
   }
 
@@ -126,8 +146,8 @@ export default function HomePage({ initialEntries, initialEvents, boardState: in
         <Navigation claimCount={entries.length} />
         <main id="top">
           <Hero />
-          <ClaimCard onClaim={handleClaim} selectedBid={selectedBid} onBidEdit={() => setSelectedBid(0)} minimumBid={floor} maximumBid={ceiling} isProcessing={claimInFlight} entries={entries} />
-          <Leaderboard entries={entries} filter={filter} onFilter={setFilter} onChallenge={handleChallenge} onReport={handleReport} boardState={boardState} />
+          <ClaimCard onClaim={handleClaim} selectedBid={selectedBid} onBidEdit={() => setSelectedBid(0)} minimumBid={floor} maximumBid={ceiling} isProcessing={claimInFlight} entries={entries} initialAppStoreUrl={initialAppStoreUrl} />
+          <Leaderboard entries={entries} filter={filter} onFilter={setFilter} onChallenge={handleChallenge} onReport={openReport} boardState={boardState} />
           <ActivityFeed activity={activity} />
         </main>
       </div>
@@ -143,6 +163,7 @@ export default function HomePage({ initialEntries, initialEvents, boardState: in
         </div>
       </footer>
       <Toast notice={notice} onClose={() => setNotice(null)} />
+      <ReportModal entry={reportEntry} onClose={() => setReportEntry(null)} onSubmit={submitReport} isSending={reportSending} />
     </>
   );
 }

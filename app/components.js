@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ALL_FILTER } from "./data";
-import { money } from "./lib/money";
+import { money, dollarsToBeat, formatLoudness } from "./lib/money";
 
 export function Ticker({ boardState = "live" }) {
   const liveLabel = boardState === "preview" ? "Preview board" : boardState === "error" ? "Board paused" : "Live board";
@@ -73,8 +73,8 @@ export function Hero() {
   );
 }
 
-export function ClaimCard({ onClaim, selectedBid, minimumBid, maximumBid, isProcessing, entries, onBidEdit }) {
-  const [form, setForm] = useState({ appStoreUrl: "", pitch: "", bid: minimumBid, acceptedRules: false, company: "" });
+export function ClaimCard({ onClaim, selectedBid, minimumBid, maximumBid, isProcessing, entries, onBidEdit, initialAppStoreUrl = "" }) {
+  const [form, setForm] = useState({ appStoreUrl: initialAppStoreUrl, pitch: "", bid: minimumBid, acceptedRules: false, company: "" });
 
   const bidDollars = Math.min(
     maximumBid,
@@ -107,7 +107,7 @@ export function ClaimCard({ onClaim, selectedBid, minimumBid, maximumBid, isProc
         <h2>Put your<br />app where<br />the noise is.</h2>
         <div className="deck-stats">
           <div className="stat"><b>{entries?.length ?? 0}</b>apps on the board</div>
-          <div className="stat"><b>{topBid ? money.format(topBid) : "—"}</b>loudest claim</div>
+          <div className="stat"><b>{topBid ? formatLoudness(topBid) : "—"}</b>loudest claim</div>
           <div className="stat"><b>{money.format(minimumBid)}</b>cheapest way in</div>
         </div>
       </div>
@@ -155,7 +155,7 @@ export function Leaderboard({ entries, filter, onFilter, onChallenge, onReport, 
           <span className="mini">Updated every time someone gets brave</span>
           <h2 id="board-title">The loud board</h2>
         </div>
-        <p>iPhone and iPad apps only, pulled straight from the App Store. Nobody is charged a cent — it is play money. A claim needs to be one dollar louder than the app above it, and every claim halves in loudness each day, so nobody holds the top by sitting still.</p>
+        <p>iPhone and iPad apps only, pulled straight from the App Store. Nobody is charged a cent — it is play money. Rank is current loudness, and taking an app&apos;s spot means claiming at least one whole dollar more than that app is worth right now. Every claim halves each day, so nobody holds the top by sitting still.</p>
       </div>
       <div className="filters" role="group" aria-label="Board categories">
         {categories.map((category) => (
@@ -191,15 +191,23 @@ function Entry({ entry, rank, onChallenge, onReport }) {
       <div className="product">
         {entry.iconUrl ? <Image className="app-icon" src={entry.iconUrl} alt="" width={44} height={44} /> : null}
         <div className="product-text">
-          <h3 className="product-name">{entry.name}</h3>
+          <h3 className="product-name">
+            {entry.url ? (
+              <a href={entry.url} target="_blank" rel="noopener noreferrer">
+                {entry.name}
+              </a>
+            ) : (
+              entry.name
+            )}
+          </h3>
           <span className="product-url">{entry.developer}</span>
         </div>
       </div>
       <p className="pitch">{entry.pitch}</p>
       <div><span className="tag">{entry.category}</span></div>
       <div className="price">
-        <b>{money.format(entry.bid)}</b>
-        <span>to beat: {money.format(Math.round(entry.bid) + 1)}</span>
+        <b>{formatLoudness(entry.bid)}</b>
+        <span>to beat: {money.format(dollarsToBeat(entry.bid))}</span>
         {faded ? <span>↓ fading from {money.format(entry.claimedBid)}</span> : null}
       </div>
       <div className="entry-actions">
@@ -234,10 +242,60 @@ export function ActivityFeed({ activity }) {
 
 export function Toast({ notice, onClose }) {
   return (
-    <div className={`toast ${notice ? "show" : ""}`} role="status" aria-live="polite">
-      <button type="button" onClick={onClose} aria-label="Dismiss">×</button>
-      <strong>{notice?.title ?? "Your noise is ready."}</strong>
-      <p>{notice?.message ?? "You just grabbed a part of the board."}</p>
+    <div className={`toast ${notice ? "show" : ""}`} role="status" aria-live="polite" aria-hidden={!notice}>
+      {notice ? (
+        <>
+          <button type="button" onClick={onClose} aria-label="Dismiss">×</button>
+          <strong>{notice.title}</strong>
+          <p>{notice.message}</p>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+export function ReportModal({ entry, onClose, onSubmit, isSending }) {
+  const [reason, setReason] = useState("This listing breaks the board rules.");
+
+  useEffect(() => {
+    if (!entry) return undefined;
+    function onKey(event) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [entry, onClose]);
+
+  if (!entry) return null;
+
+  function submit(event) {
+    event.preventDefault();
+    onSubmit(reason.trim());
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <form className="modal" role="dialog" aria-modal="true" aria-labelledby="report-title" onClick={(event) => event.stopPropagation()} onSubmit={submit}>
+        <span className="mini">Keep the board honest</span>
+        <h2 id="report-title">Report {entry.name}</h2>
+        <p>Say why this listing should come off the board. A moderator will see it.</p>
+        <label className="mini" htmlFor="report-reason">Why are you reporting this?</label>
+        <textarea
+          className="field"
+          id="report-reason"
+          required
+          minLength="12"
+          maxLength="280"
+          rows="4"
+          autoFocus
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+        />
+        <div className="modal-actions">
+          <button className="claim-mini" type="button" onClick={onClose}>Cancel</button>
+          <button className="button" type="submit" disabled={isSending}>{isSending ? "Sending…" : "Send report"}</button>
+        </div>
+      </form>
     </div>
   );
 }

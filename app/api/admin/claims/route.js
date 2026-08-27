@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { timingSafeEqual, createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { listAllClaims, listReports, setClaimHidden } from "../../../lib/db";
 import { ConfigurationError, getAdminToken } from "../../../lib/env";
@@ -7,12 +7,14 @@ import { claimIdSchema } from "../../../lib/validation";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function tokenDigest(value) {
+  return createHash("sha256").update(value).digest();
+}
+
 function isAuthorized(request) {
   const presented = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || "";
   const expected = getAdminToken();
-  const a = Buffer.from(presented);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
+  return timingSafeEqual(tokenDigest(presented), tokenDigest(expected));
 }
 
 function guard(request) {
@@ -47,8 +49,11 @@ export async function PATCH(request) {
     if (!claimId.success) return NextResponse.json({ error: "Invalid claim id." }, { status: 400 });
     if (typeof body.hidden !== "boolean") return NextResponse.json({ error: "hidden must be a boolean." }, { status: 400 });
 
-    const updated = await setClaimHidden(claimId.data, body.hidden);
-    if (!updated) return NextResponse.json({ error: "Claim not found." }, { status: 404 });
+    const result = await setClaimHidden(claimId.data, body.hidden);
+    if (result.conflict) {
+      return NextResponse.json({ error: "That app is already listed. Hide the live listing first." }, { status: 409 });
+    }
+    if (!result.updated) return NextResponse.json({ error: "Claim not found." }, { status: 404 });
     return NextResponse.json({ claimId: claimId.data, hidden: body.hidden });
   } catch (error) {
     console.error("Unable to update LoudList claim", error);
