@@ -16,5 +16,5 @@ export function beatsCurrent(
   claimedAt: number | string | Date,
   now = Date.now(),
 ): boolean {
-  return nextCents > decayedCents(currentAmountCents, claimedAt, now);
+  return nextCents >= Math.floor(decayedCents(currentAmountCents, claimedAt, now)) + 100;
 }

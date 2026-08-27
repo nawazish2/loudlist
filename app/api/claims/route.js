@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { AppStoreError, lookupApp } from "../../lib/appstore";
 import { claimApp, getCurrentBidForApp } from "../../lib/db";
 import { getSiteUrl, isDatabaseConfigured } from "../../lib/env";
+import { dollarsToBeat } from "../../lib/money";
 import { isAllowedClaimOrigin } from "../../lib/origin";
+import { requestIdentity } from "../../lib/request-identity";
 import { limitClaim } from "../../lib/rate-limit";
 import { claimRequestSchema } from "../../lib/validation";
 
@@ -11,10 +13,6 @@ export const dynamic = "force-dynamic";
 
 function response(body, options = {}) {
   return NextResponse.json(body, { headers: { "Cache-Control": "no-store" }, ...options });
-}
-
-function requestIdentity(request) {
-  return request.headers.get("x-real-ip") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous";
 }
 
 export async function POST(request) {
@@ -33,7 +31,7 @@ export async function POST(request) {
 
     const input = claimRequestSchema.safeParse(raw);
     if (!input.success) return response({ error: input.error.issues[0]?.message || "Check the claim details and try again." }, { status: 400 });
-    if (input.data.company) return response({ error: "Unable to create this claim." }, { status: 400 });
+    if ((input.data.company || "").trim()) return response({ error: "Unable to create this claim." }, { status: 400 });
 
     const rate = await limitClaim(requestIdentity(request));
     if (!rate.success) {
@@ -53,10 +51,11 @@ export async function POST(request) {
 
     if (!claim) {
       const currentCents = await getCurrentBidForApp(app.appId);
-      const needed = currentCents === null ? null : Math.round(currentCents / 100) + 1;
+      const currentDollars = currentCents === null ? null : Math.floor(currentCents / 100);
+      const needed = currentCents === null ? null : dollarsToBeat(currentCents / 100);
       return response({
         error: needed
-          ? `${app.name} is already on the board at $${Math.round(currentCents / 100)}. You need $${needed} to take it.`
+          ? `${app.name} is already on the board at $${currentDollars}. You need $${needed} to take it.`
           : `${app.name} is already on the board at a louder number.`,
       }, { status: 409 });
     }
@@ -64,6 +63,6 @@ export async function POST(request) {
     return response({ claim });
   } catch (error) {
     console.error("Unable to create LoudList claim", error);
-    return response({ error: "We could not get you on the board. Try again in a moment." }, { status: 502 });
+    return response({ error: "We could not get you on the board. Try again in a moment." }, { status: 503 });
   }
 }

@@ -186,27 +186,29 @@ export async function claimApp({ id, appId, url, name, developer, iconUrl, pitch
         icon_url = EXCLUDED.icon_url,
         category = EXCLUDED.category,
         hidden = FALSE
-      WHERE EXCLUDED.amount_cents > ${DECAYED(query, "loudlist_claims")}
+      WHERE EXCLUDED.amount_cents >= (FLOOR(${DECAYED(query, "loudlist_claims")})::INTEGER + 100)
       RETURNING id, app_id, url, display_name, developer, icon_url, pitch, category, amount_cents, hidden, claimed_at
+    ), ranked AS (
+      SELECT c.id, c.app_id, c.url, c.display_name, c.developer, c.icon_url, c.pitch, c.category, c.amount_cents, c.hidden, c.claimed_at,
+        ${DECAYED(query, "c")} AS decayed_cents,
+        board.rank
+      FROM upserted c
+      JOIN (
+        SELECT id, ROW_NUMBER() OVER (ORDER BY ${DECAYED(query)} DESC, claimed_at ASC, id ASC)::INTEGER AS rank
+        FROM loudlist_claims
+        WHERE hidden = FALSE
+      ) board ON board.id = c.id
+    ), recorded AS (
+      INSERT INTO loudlist_events (id, claim_id, app_id, display_name, amount_cents, rank)
+      SELECT ${crypto.randomUUID()}, id, app_id, display_name, amount_cents, rank FROM ranked
+      RETURNING claim_id
     )
-    SELECT c.id, c.app_id, c.url, c.display_name, c.developer, c.icon_url, c.pitch, c.category, c.amount_cents, c.hidden, c.claimed_at,
-      ${DECAYED(query, "c")} AS decayed_cents,
-      (
-        SELECT COUNT(*)::INTEGER + 1
-        FROM loudlist_claims contender
-        WHERE contender.hidden = FALSE AND contender.id <> c.id
-          AND ${DECAYED(query, "contender")} > ${DECAYED(query, "c")}
-      ) AS rank
-    FROM upserted c
+    SELECT ranked.id, ranked.app_id, ranked.url, ranked.display_name, ranked.developer, ranked.icon_url, ranked.pitch, ranked.category,
+      ranked.amount_cents, ranked.hidden, ranked.claimed_at, ranked.decayed_cents, ranked.rank
+    FROM ranked
+    JOIN recorded ON recorded.claim_id = ranked.id
   `;
-  const claim = mapClaim(rows[0]);
-  if (!claim) return null;
-
-  await query`
-    INSERT INTO loudlist_events (id, claim_id, app_id, display_name, amount_cents, rank)
-    VALUES (${crypto.randomUUID()}, ${claim.id}, ${claim.appId}, ${claim.name}, ${claim.amountCents}, ${claim.rank})
-  `;
-  return claim;
+  return mapClaim(rows[0]);
 }
 
 export async function getCurrentBidForApp(appId) {
@@ -227,13 +229,13 @@ export async function getClaim(claimId) {
   const rows = await query`
     SELECT c.id, c.app_id, c.url, c.display_name, c.developer, c.icon_url, c.pitch, c.category, c.amount_cents, c.hidden, c.claimed_at,
       ${DECAYED(query, "c")} AS decayed_cents,
-      CASE WHEN c.hidden = FALSE THEN (
-        SELECT COUNT(*)::INTEGER + 1
-        FROM loudlist_claims contender
-        WHERE contender.hidden = FALSE AND contender.id <> c.id
-          AND ${DECAYED(query, "contender")} > ${DECAYED(query, "c")}
-      ) ELSE NULL END AS rank
+      CASE WHEN c.hidden = FALSE THEN board.rank ELSE NULL END AS rank
     FROM loudlist_claims c
+    LEFT JOIN (
+      SELECT id, ROW_NUMBER() OVER (ORDER BY ${DECAYED(query)} DESC, claimed_at ASC, id ASC)::INTEGER AS rank
+      FROM loudlist_claims
+      WHERE hidden = FALSE
+    ) board ON board.id = c.id
     WHERE c.id = ${claimId}
     LIMIT 1
   `;
@@ -243,8 +245,29 @@ export async function getClaim(claimId) {
 export async function setClaimHidden(claimId, hidden) {
   await ensureSchema();
   const query = sql();
-  const rows = await query`UPDATE loudlist_claims SET hidden = ${hidden} WHERE id = ${claimId} RETURNING id`;
-  return rows.length === 1;
+
+  if (hidden) {
+    const rows = await query`UPDATE loudlist_claims SET hidden = TRUE WHERE id = ${claimId} RETURNING id`;
+    return { updated: rows.length === 1 };
+  }
+
+  const rows = await query`
+    UPDATE loudlist_claims SET hidden = FALSE
+    WHERE id = ${claimId}
+      AND NOT EXISTS (
+        SELECT 1 FROM loudlist_claims other
+        WHERE other.app_id = loudlist_claims.app_id
+          AND other.hidden = FALSE
+          AND other.id <> ${claimId}
+      )
+    RETURNING id
+  `;
+  if (rows.length === 1) return { updated: true };
+
+  const existing = await query`SELECT hidden FROM loudlist_claims WHERE id = ${claimId} LIMIT 1`;
+  if (!existing.length) return { updated: false };
+  if (!existing[0].hidden) return { updated: true };
+  return { conflict: true };
 }
 
 export async function listAllClaims(limit = 200) {
@@ -273,9 +296,9 @@ export async function createReport({ id, claimId, reason }) {
   await ensureSchema();
   const query = sql();
   const claim = await getClaim(claimId);
-  if (!claim) return null;
+  if (!claim || claim.hidden) return null;
   await query`INSERT INTO loudlist_reports (id, claim_id, reason) VALUES (${id}, ${claimId}, ${reason})`;
-  return { id, claimId, reason };
+  return { id, claimId, reason, name: claim.name };
 }
 
 export async function recordClaimAttempt(identifier, windowSeconds, limit) {

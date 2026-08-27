@@ -1,16 +1,14 @@
 import { NextResponse } from "next/server";
 import { createReport } from "../../lib/db";
 import { getSiteUrl, isDatabaseConfigured } from "../../lib/env";
+import { notifyReport } from "../../lib/notify";
 import { isAllowedClaimOrigin } from "../../lib/origin";
+import { requestIdentity } from "../../lib/request-identity";
 import { limitReport } from "../../lib/rate-limit";
 import { reportRequestSchema } from "../../lib/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function requestIdentity(request) {
-  return request.headers.get("x-real-ip") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous";
-}
 
 export async function POST(request) {
   try {
@@ -30,6 +28,7 @@ export async function POST(request) {
 
     const report = await createReport({ id: crypto.randomUUID(), claimId: input.data.claimId, reason: input.data.reason });
     if (!report) return NextResponse.json({ error: "Claim not found." }, { status: 404 });
+    await notifyReport({ report, claim: { name: report.name } });
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Unable to record LoudList report", error);

@@ -4,7 +4,7 @@ export const metadata = { title: "Board rules — LOUDLIST" };
 
 export default function TermsPage() {
   return (
-    <LegalPage eyebrow="The fine print" title={<>Board<br />rules.</>} updated="25 August 2026">
+    <LegalPage eyebrow="The fine print" title={<>Board<br />rules.</>} updated="27 August 2026">
       <h2>iOS apps only</h2>
       <p>This board lists iPhone and iPad apps and nothing else. A listing is created from an App Store link, and the app&apos;s name, developer, icon and category are taken from the App Store rather than typed in. Mac-only apps, and anything on Apple&apos;s store that is not an app, are refused.</p>
 
@@ -15,7 +15,7 @@ export default function TermsPage() {
       <p>Listings are ordered by their current loudness, highest first. Ties are broken by whichever app claimed first. Claiming a bigger number than an existing listing places you above it and pushes it down. Your rank can and will fall when other people claim louder. That is the entire point of the board.</p>
 
       <h2>One listing per app</h2>
-      <p>Each app holds a single spot. Claiming an app that is already on the board replaces its listing — which is also how you defend a spot as it fades — but only if your number is genuinely louder than that listing is right now. A quieter claim is refused, so nobody can knock an app down by re-claiming it cheaply.</p>
+      <p>Each app holds a single spot. Claiming an app that is already on the board replaces its listing — which is also how you defend a spot as it fades — but only if your number is at least one whole dollar louder than that listing is right now. A quieter claim, or the same dollar amount, is refused, so nobody can knock an app down by re-claiming it cheaply.</p>
       <p>Anyone can claim any app. We do not verify that you built it. Listing an app you do not own is allowed and is part of how the board works, but the rules below on impersonation and misleading content still apply.</p>
 
       <h2>Everything fades</h2>

@@ -5,12 +5,17 @@ import HomePage from "./home";
 
 export const dynamic = "force-dynamic";
 
-export default async function Page() {
+export default async function Page({ searchParams }) {
+  const params = await searchParams;
+  const reclaimUrl = typeof params?.reclaim === "string" ? params.reclaim.slice(0, 2048) : "";
   const minimumBid = getRequiredBidFloor() / 100;
   const maximumBid = getMaximumBid() / 100;
 
   if (!isDatabaseConfigured()) {
-    return <HomePage initialEntries={seedEntries} initialEvents={[]} boardState="preview" minimumBid={minimumBid} maximumBid={maximumBid} />;
+    if (process.env.NODE_ENV === "production") {
+      return <HomePage initialEntries={[]} initialEvents={[]} boardState="error" minimumBid={minimumBid} maximumBid={maximumBid} initialAppStoreUrl={reclaimUrl} />;
+    }
+    return <HomePage initialEntries={seedEntries} initialEvents={[]} boardState="preview" minimumBid={minimumBid} maximumBid={maximumBid} initialAppStoreUrl={reclaimUrl} />;
   }
 
   let entries = [];
@@ -25,5 +30,5 @@ export default async function Page() {
     boardState = "error";
   }
 
-  return <HomePage initialEntries={entries} initialEvents={events} boardState={boardState} minimumBid={minimumBid} maximumBid={maximumBid} />;
+  return <HomePage initialEntries={entries} initialEvents={events} boardState={boardState} minimumBid={minimumBid} maximumBid={maximumBid} initialAppStoreUrl={reclaimUrl} />;
 }
